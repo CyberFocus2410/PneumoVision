@@ -1,0 +1,30 @@
+# Core Deep Learning
+torch>=2.2.0
+torchvision>=0.17.0
+
+# Medical Imaging & Image Processing
+pydicom>=2.4.0
+opencv-python>=4.8.0
+pillow>=10.0.0
+scikit-learn>=1.4.0
+scipy>=1.12.0
+
+# Data & Config
+numpy>=1.26.0
+pandas>=2.2.0
+pyyaml>=6.0.1
+pydantic>=2.7.0
+
+# Backend & API
+fastapi>=0.111.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+
+# Reporting & Visualization
+reportlab>=4.1.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# Experiment Tracking & Metrics
+tqdm>=4.66.0
+pytest>=8.0.0

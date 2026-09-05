@@ -1,0 +1,65 @@
+{
+  "model_name": "PneumoDenseNet121",
+  "target_classes": [
+    "Pneumonia",
+    "Cardiomegaly",
+    "Pleural Effusion",
+    "Atelectasis",
+    "No Finding"
+  ],
+  "metrics": {
+    "auroc_Pneumonia": 1.0,
+    "auprc_Pneumonia": 1.0,
+    "auroc_Cardiomegaly": 1.0,
+    "auprc_Cardiomegaly": 1.0,
+    "auroc_Pleural Effusion": 1.0,
+    "auprc_Pleural Effusion": 1.0,
+    "auroc_Atelectasis": 1.0,
+    "auprc_Atelectasis": 1.0,
+    "auroc_No Finding": 1.0,
+    "auprc_No Finding": 1.0,
+    "macro_auroc": 1.0,
+    "macro_auprc": 1.0
+  },
+  "temperature": 1.1480042934417725,
+  "thresholds": {
+    "Pneumonia": {
+      "threshold": 0.38,
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "Cardiomegaly": {
+      "threshold": 0.36,
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "Pleural Effusion": {
+      "threshold": 0.42,
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "Atelectasis": {
+      "threshold": 0.37,
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "No Finding": {
+      "threshold": 0.44,
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  },
+  "ece_results": {
+    "ece_Pneumonia": 0.3547,
+    "ece_Cardiomegaly": 0.3489,
+    "ece_Pleural Effusion": 0.3778,
+    "ece_Atelectasis": 0.402,
+    "ece_No Finding": 0.2772,
+    "macro_ece": 0.3521
+  }
+}

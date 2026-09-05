@@ -1,0 +1,32 @@
+# PneumoVision Multi-Dataset Label Harmonization Taxonomy
+# Explicit mapping between target findings and source dataset annotations
+
+target_taxonomy:
+  - Pneumonia
+  - Cardiomegaly
+  - Pleural Effusion
+  - Atelectasis
+  - No Finding
+
+datasets:
+  nih_chestxray14:
+    Pneumonia: "Pneumonia"
+    Cardiomegaly: "Cardiomegaly"
+    Pleural Effusion: "Effusion"
+    Atelectasis: "Atelectasis"
+    No Finding: "No Finding"
+  
+  chexpert:
+    Pneumonia: "Pneumonia"
+    Cardiomegaly: "Cardiomegaly"
+    Pleural Effusion: "Pleural Effusion"
+    Atelectasis: "Atelectasis"
+    No Finding: "No Finding"
+    uncertainty_policy: "u_zeros" # Treat -1 as 0 for robust lower-bound estimation
+
+  mimic_cxr:
+    Pneumonia: "Pneumonia"
+    Cardiomegaly: "Cardiomegaly"
+    Pleural Effusion: "Pleural Effusion"
+    Atelectasis: "Atelectasis"
+    No Finding: "No Finding"
