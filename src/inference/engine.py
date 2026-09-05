@@ -197,33 +197,51 @@ class PneumoInferenceEngine:
         for cls_name, p_val, idx in classes_to_cam:
             try:
                 # Requires grad for backward pass
-                cam_2d = self.gradcam.generate_heatmap(tensor_img, target_class_idx=idx, use_gradcam_plusplus=True)
+                cam_2d = self.gradcam.generate_heatmap(
+                    tensor_img,
+                    target_class_idx=idx,
+                    use_gradcam_plusplus=True,
+                    class_name=cls_name,
+                    raw_image=pil_img
+                )
                 heatmaps[cls_name] = cam_2d
 
                 loc_data = extract_heatmap_localization_data(cam_2d, image_shape=pil_img.size[::-1])
                 
                 if save_heatmaps:
-                    overlay_img = overlay_heatmap_on_image(pil_img, cam_2d, alpha=0.48, draw_contours=True, draw_box=True)
+                    overlay_img = overlay_heatmap_on_image(pil_img, cam_2d, alpha=0.55, threshold=0.36, draw_contours=True, draw_box=True)
                     side_by_side = create_side_by_side_comparison(pil_img, overlay_img, finding_title=cls_name)
 
+                    fn_orig = f"{case_id}_original.png"
                     fn_overlay = f"{case_id}_{cls_name.lower().replace(' ', '_')}_overlay.png"
                     fn_side = f"{case_id}_{cls_name.lower().replace(' ', '_')}_side.png"
 
+                    orig_path = HEATMAPS_DIR / fn_orig
                     overlay_path = HEATMAPS_DIR / fn_overlay
                     side_path = HEATMAPS_DIR / fn_side
 
+                    if not orig_path.exists():
+                        pil_img.save(orig_path)
                     overlay_img.save(overlay_path)
                     side_by_side.save(side_path)
 
                     heatmap_files[cls_name] = {
                         "overlay_url": f"/static/heatmaps/{fn_overlay}",
                         "side_url": f"/static/heatmaps/{fn_side}",
+                        "original_url": f"/static/heatmaps/{fn_orig}",
                         "overlay_path": str(overlay_path),
                         "side_path": str(side_path),
+                        "original_path": str(orig_path),
                         "localization": loc_data
                     }
             except Exception as cam_err:
                 print(f"Warning: GradCAM failed for {cls_name}: {cam_err}")
+
+        # Always save original image URL
+        fn_orig_main = f"{case_id}_original.png"
+        orig_main_path = HEATMAPS_DIR / fn_orig_main
+        if not orig_main_path.exists():
+            pil_img.save(orig_main_path)
 
         return {
             "case_id": case_id,
@@ -236,5 +254,6 @@ class PneumoInferenceEngine:
             "primary_finding": primary_finding,
             "heatmaps": heatmap_files,
             "raw_heatmaps": heatmaps,
-            "original_image": pil_img
+            "original_image": pil_img,
+            "original_image_url": f"/static/heatmaps/{fn_orig_main}"
         }

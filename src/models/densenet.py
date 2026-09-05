@@ -38,7 +38,7 @@ class PneumoDenseNet(nn.Module):
         self.classifier = nn.Sequential(
             nn.Dropout(p=dropout_rate),
             nn.Linear(num_features, hidden_dim),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Dropout(p=dropout_rate),
             nn.Linear(hidden_dim, num_classes)
         )
@@ -46,7 +46,7 @@ class PneumoDenseNet(nn.Module):
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
         """Returns feature maps from the final dense layer."""
         features = self.features(x)
-        out = nn.functional.relu(features, inplace=True)
+        out = nn.functional.relu(features, inplace=False)
         return out
 
     def forward(self, x: torch.Tensor, return_logits: bool = True) -> torch.Tensor:

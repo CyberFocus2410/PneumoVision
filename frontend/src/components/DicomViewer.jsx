@@ -33,6 +33,8 @@ export default function DicomViewer({
   let displayUrl = null;
   if (viewMode === 'side') {
     displayUrl = activeHeatmapData?.side_url;
+  } else if (viewMode === 'original') {
+    displayUrl = analysisResult?.original_image_url || activeHeatmapData?.original_url;
   } else {
     displayUrl = activeHeatmapData?.overlay_url;
   }
@@ -60,6 +62,12 @@ export default function DicomViewer({
             onClick={() => setViewMode('overlay')}
           >
             <Sparkles size={13} /> Grad-CAM++ Focus
+          </button>
+          <button
+            className={`pacs-tool-btn ${viewMode === 'original' ? 'active' : ''}`}
+            onClick={() => setViewMode('original')}
+          >
+            <ImageIcon size={13} /> Clean Radiograph
           </button>
           <button
             className={`pacs-tool-btn ${viewMode === 'side' ? 'active' : ''}`}

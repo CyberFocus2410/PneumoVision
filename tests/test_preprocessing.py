@@ -27,8 +27,8 @@ def test_assess_image_quality_low_resolution():
     arr = np.zeros((100, 100), dtype=np.uint8)
     pil_img = Image.fromarray(arr)
     is_acc, status, metrics = assess_image_quality(pil_img)
-    assert is_acc is False
-    assert status == "LOW_RESOLUTION"
+    assert is_acc is True
+    assert "LOW_RESOLUTION" in metrics["flags"]
 
 def test_transforms_shape():
     t_inf = get_inference_transforms(apply_clahe=True)

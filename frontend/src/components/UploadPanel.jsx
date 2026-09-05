@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
 import {
   UploadCloud, FileText, User, Calendar, Activity,
-  CheckCircle2, AlertCircle, FileCode, Search
+  CheckCircle2, AlertCircle, FileCode, Search, Image as ImageIcon, Loader2
 } from 'lucide-react';
 
 export default function UploadPanel({
   samples = [],
   selectedSample,
+  uploadedFileName,
   onSelectSample,
   onUploadFile,
   isAnalyzing,
@@ -15,20 +16,69 @@ export default function UploadPanel({
 }) {
   const fileInputRef = useRef(null);
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      onUploadFile(e.dataTransfer.files[0]);
+    }
+  };
+
   return (
     <div className="pacs-sidebar-left">
-      {/* Patient Worklist Section */}
+      {/* 1. Custom File Upload Section */}
       <div className="panel-section">
         <div className="panel-header-title">
-          <span>Clinical Case Worklist</span>
+          <span>Radiograph Ingestion</span>
+          {isAnalyzing && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--cyan-primary)', fontSize: '0.68rem' }}>
+              <Loader2 size={12} className="status-dot" /> Processing...
+            </span>
+          )}
+        </div>
+
+        <div
+          className="mini-dropzone"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            borderColor: uploadedFileName ? 'var(--cyan-primary)' : undefined,
+            background: uploadedFileName ? 'rgba(6, 182, 212, 0.08)' : undefined
+          }}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".dcm,.png,.jpg,.jpeg,.webp,.tiff,.bmp"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                onUploadFile(e.target.files[0]);
+              }
+            }}
+          />
+          <UploadCloud size={24} color="var(--cyan-primary)" />
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {uploadedFileName ? `Loaded: ${uploadedFileName}` : 'Upload Any Chest X-Ray / DICOM'}
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+            Drag & drop or browse (DICOM, PNG, JPEG, WEBP)
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Clinical Benchmark Worklist */}
+      <div className="panel-section" style={{ flex: 1 }}>
+        <div className="panel-header-title">
+          <span>Benchmark Patient Cases</span>
           <span style={{ fontSize: '0.68rem', color: 'var(--cyan-primary)', fontFamily: 'var(--font-mono)' }}>
-            {samples.length} Benchmark Cases
+            {samples.length} Curated Cases
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {samples.map((s) => {
-            const isSelected = selectedSample === s.id;
+            const isSelected = selectedSample === s.id && !uploadedFileName;
             const isNormal = s.ground_truth === 'No Finding';
 
             return (
@@ -61,45 +111,18 @@ export default function UploadPanel({
         </div>
       </div>
 
-      {/* Upload Custom DICOM / X-Ray */}
-      <div className="panel-section">
-        <div className="panel-header-title">
-          <span>Custom Radiograph Ingestion</span>
-        </div>
-
-        <div
-          className="mini-dropzone"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            accept=".dcm,.png,.jpg,.jpeg"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                onUploadFile(e.target.files[0]);
-              }
-            }}
-          />
-          <UploadCloud size={20} color="var(--cyan-primary)" />
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Upload Local DICOM / CXR
-          </div>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            DICOM (.dcm), PNG, JPEG
-          </div>
-        </div>
-      </div>
-
-      {/* Quality & DICOM Metadata Tags */}
+      {/* 3. Acquisition Quality Telemetry */}
       {qualityMetrics && (
         <div className="panel-section">
           <div className="panel-header-title">
-            <span>QA Telemetry & DICOM Header</span>
+            <span>Image Quality Status</span>
             <span style={{
               fontSize: '0.65rem',
-              color: qualityMetrics.is_acceptable ? 'var(--emerald-success)' : 'var(--crimson-alert)',
+              fontWeight: 700,
+              padding: '1px 6px',
+              borderRadius: '3px',
+              background: 'rgba(16, 185, 129, 0.15)',
+              color: 'var(--emerald-success)',
               fontFamily: 'var(--font-mono)'
             }}>
               {qualityMetrics.status}
@@ -110,7 +133,7 @@ export default function UploadPanel({
             <div>Resolution: {qualityMetrics.resolution}</div>
             <div>Entropy: {qualityMetrics.entropy}</div>
             <div>Sharpness: {qualityMetrics.sharpness_index}</div>
-            <div>View: {dicomMetadata?.view_position || 'PA'}</div>
+            <div>Contrast: {qualityMetrics.std_contrast}</div>
           </div>
         </div>
       )}

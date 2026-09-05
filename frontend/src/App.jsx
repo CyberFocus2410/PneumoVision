@@ -14,6 +14,7 @@ export default function App() {
   const [healthData, setHealthData] = useState(null);
   const [samplesList, setSamplesList] = useState([]);
   const [selectedSample, setSelectedSample] = useState('sample_pneumonia');
+  const [uploadedFileName, setUploadedFileName] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [selectedFinding, setSelectedFinding] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -44,6 +45,7 @@ export default function App() {
 
   const handleSelectSample = async (sampleId) => {
     setSelectedSample(sampleId);
+    setUploadedFileName(null);
     setIsAnalyzing(true);
     try {
       const data = await analyzeImage(sampleId);
@@ -59,6 +61,7 @@ export default function App() {
 
   const handleUploadFile = async (file) => {
     setSelectedSample(null);
+    setUploadedFileName(file.name);
     setIsAnalyzing(true);
     try {
       const data = await analyzeImage(file);
@@ -91,6 +94,7 @@ export default function App() {
             onSelectSample={handleSelectSample}
             onUploadFile={handleUploadFile}
             selectedSample={selectedSample}
+            uploadedFileName={uploadedFileName}
             isAnalyzing={isAnalyzing}
             dicomMetadata={analysisResult?.dicom_metadata}
             qualityMetrics={analysisResult?.quality_metrics}

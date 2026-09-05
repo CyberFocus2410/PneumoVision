@@ -1,35 +1,34 @@
 """
 Enhanced Explainability Visualizer for PneumoVision
-Produces crisp, threshold-gated Grad-CAM++ overlays, anatomical bounding boxes,
+Produces crisp, transparent-background Grad-CAM++ overlays, anatomical bounding boxes,
 contour outlines, hotspot center-of-mass detection, and anatomical quadrant localization.
 """
 
 from typing import Tuple, Optional, Dict, List, Union, Any
 import numpy as np
 import cv2
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 def get_anatomical_quadrant(center_x_norm: float, center_y_norm: float) -> str:
     """
     Maps normalized coordinates (0.0 to 1.0) to standard clinical thoracic landmarks.
-    Note: In frontal chest radiographs, image Left is Patient Right!
+    In frontal chest radiographs: image Left is Patient Right hemithorax!
     """
-    # Patient laterality: x < 0.5 is Patient Right hemithorax, x >= 0.5 is Patient Left
     is_patient_right = center_x_norm < 0.5
     side_str = "Right" if is_patient_right else "Left"
 
     if center_y_norm < 0.35:
-        level_str = "Upper Lobe / Apical Region"
+        level_str = "Upper Lobe / Apical Zone"
     elif center_y_norm < 0.65:
         if 0.35 <= center_x_norm <= 0.65:
-            return "Perihilar / Cardiac Mediastinal Silhouette"
+            return "Perihilar / Mediastinal Silhouette"
         level_str = "Mid-Lung Zone"
     elif center_y_norm < 0.85:
         if 0.35 <= center_x_norm <= 0.60:
             return "Cardiac Apex / Paracardiac Region"
         level_str = "Lower Lobe / Basilar Airspace"
     else:
-        level_str = "Costophrenic Sulcus / Diaphragmatic Margin"
+        level_str = "Costophrenic Sulcus / Diaphragmatic Angle"
 
     return f"{side_str} {level_str}"
 
@@ -37,16 +36,16 @@ def get_anatomical_quadrant(center_x_norm: float, center_y_norm: float) -> str:
 def overlay_heatmap_on_image(
     original_img: Union[Image.Image, np.ndarray],
     heatmap_2d: np.ndarray,
-    alpha: float = 0.50,
+    alpha: float = 0.55,
     colormap: int = cv2.COLORMAP_TURBO,
-    threshold: float = 0.20,
+    threshold: float = 0.36,
     draw_contours: bool = True,
     draw_box: bool = True
 ) -> Image.Image:
     """
-    Overlays a crisp, threshold-gated Grad-CAM++ heatmap onto the radiograph.
-    Low activations below threshold are left transparent to keep normal lung tissue clear.
-    Draws highlighted boundary contours around the focal region of model attention.
+    Overlays a crisp, localized Grad-CAM++ heatmap onto the radiograph.
+    Background tissue below the threshold is left completely transparent and unaffected,
+    preventing washed-out or hazy full-image overlays.
     """
     if isinstance(original_img, Image.Image):
         orig_np = np.array(original_img.convert("RGB"))
@@ -55,51 +54,52 @@ def overlay_heatmap_on_image(
 
     h, w = orig_np.shape[:2]
 
-    # 1. Resize heatmap to image dimensions with high-order interpolation
+    # Resize heatmap with high-precision bicubic interpolation
     resized = cv2.resize(heatmap_2d, (w, h), interpolation=cv2.INTER_CUBIC)
     resized = np.clip(resized, 0.0, 1.0)
 
-    # 2. Threshold gating: zero out background noise so anatomy is clean
+    # Smooth Gaussian blur for clean, organic heat gradients
+    resized = cv2.GaussianBlur(resized, (15, 15), 3.0)
+    
+    # Threshold gating: only render meaningful focus zones
     gated = np.copy(resized)
     gated[gated < threshold] = 0.0
 
-    # Rescale gated values to [0, 1]
     if np.max(gated) > 0:
-        gated = (gated - np.min(gated[gated > 0])) / (np.max(gated) - np.min(gated[gated > 0]) + 1e-8)
+        gated = (gated - threshold) / (np.max(gated) - threshold + 1e-8)
         gated = np.clip(gated, 0.0, 1.0)
 
-    # 3. Apply Colormap
+    # Convert to 8-bit colormap
     heatmap_uint8 = (gated * 255.0).astype(np.uint8)
     colored_cam = cv2.applyColorMap(heatmap_uint8, colormap)
     colored_cam = cv2.cvtColor(colored_cam, cv2.COLOR_BGR2RGB)
 
-    # 4. Alpha blend only for pixels above threshold
-    mask_3d = np.repeat((gated > 0.05)[:, :, np.newaxis], 3, axis=2)
+    # Blend original image and colored heatmap only where activation > 0
     blended = np.copy(orig_np)
+    mask = gated > 0.02
     
-    # Smooth alpha weighting proportional to activation intensity
-    pixel_alpha = (gated[:, :, np.newaxis] * alpha)
-    blended_hotspots = (orig_np * (1.0 - pixel_alpha) + colored_cam * pixel_alpha).astype(np.uint8)
-    blended[mask_3d] = blended_hotspots[mask_3d]
+    if np.any(mask):
+        pixel_weight = np.repeat((gated * alpha)[:, :, np.newaxis], 3, axis=2)
+        blended_hotspots = (orig_np * (1.0 - pixel_weight) + colored_cam * pixel_weight).astype(np.uint8)
+        blended[mask] = blended_hotspots[mask]
 
-    # 5. Draw smooth contours around high-activation focal zones (>= 0.40)
+    # Draw clinical contour line around focal peak region (>= 0.45)
     if draw_contours:
         high_mask = (resized >= 0.45).astype(np.uint8) * 255
         contours, _ = cv2.findContours(high_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(blended, contours, -1, (255, 220, 0), 2, cv2.LINE_AA)
+        cv2.drawContours(blended, contours, -1, (255, 215, 0), 2, cv2.LINE_AA)
 
-    # 6. Draw Peak Attention Box if strong focal activation exists
+    # Draw Peak Attention Crosshair & Bounding Box
     if draw_box:
         high_mask = (resized >= 0.50).astype(np.uint8) * 255
         contours, _ = cv2.findContours(high_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest_c = max(contours, key=cv2.contourArea)
-            if cv2.contourArea(largest_c) > 100:
+            if cv2.contourArea(largest_c) > 120:
                 bx, by, bw, bh = cv2.boundingRect(largest_c)
                 cv2.rectangle(blended, (bx, by), (bx + bw, by + bh), (6, 182, 212), 2, cv2.LINE_AA)
-                # Small corner crosshair
                 cx, cy = bx + bw // 2, by + bh // 2
-                cv2.drawMarker(blended, (cx, cy), (6, 182, 212), markerType=cv2.MARKER_CROSS, markerSize=14, thickness=2)
+                cv2.drawMarker(blended, (cx, cy), (6, 182, 212), markerType=cv2.MARKER_CROSS, markerSize=16, thickness=2)
 
     return Image.fromarray(blended)
 
@@ -115,17 +115,13 @@ def extract_heatmap_localization_data(
     resized = cv2.resize(heatmap_2d, (w_img, h_img), interpolation=cv2.INTER_CUBIC)
     resized = np.clip(resized, 0.0, 1.0)
 
-    # Find peak location
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(resized)
     peak_x, peak_y = max_loc
 
-    # Normalized center coordinates
     norm_x = peak_x / float(w_img)
     norm_y = peak_y / float(h_img)
 
     anatomical_site = get_anatomical_quadrant(norm_x, norm_y)
-
-    # Focal area coverage (% of lung field covered by >= 0.4 activation)
     focal_coverage_pct = float(np.sum(resized >= 0.40)) / float(h_img * w_img) * 100.0
 
     return {
@@ -162,7 +158,6 @@ def create_side_by_side_comparison(
     if h2 != target_h:
         over_np = cv2.resize(over_np, (int(w2 * target_h / h2), target_h))
 
-    # Add dividing margin
     separator = np.ones((target_h, 8, 3), dtype=np.uint8) * 180
     combined = np.hstack([orig_np, separator, over_np])
 
