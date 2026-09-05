@@ -33,11 +33,11 @@ TARGET_CLASSES = [
 
 # Clinical Default thresholds tuned via validation set PR-F1 optimization
 DEFAULT_THRESHOLDS = {
-    "Pneumonia": 0.38,
-    "Cardiomegaly": 0.42,
-    "Pleural Effusion": 0.35,
-    "Atelectasis": 0.36,
-    "No Finding": 0.50
+    "Pneumonia": 0.42,
+    "Cardiomegaly": 0.40,
+    "Pleural Effusion": 0.42,
+    "Atelectasis": 0.39,
+    "No Finding": 0.41
 }
 
 # Image Input Dimensions

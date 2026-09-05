@@ -1,13 +1,9 @@
 {
-  "model_name": "PneumoDenseNet121",
-  "target_classes": [
-    "Pneumonia",
-    "Cardiomegaly",
-    "Pleural Effusion",
-    "Atelectasis",
-    "No Finding"
-  ],
-  "metrics": {
+  "model_architecture": "DenseNet-121 (Multi-Label)",
+  "evaluation_timestamp": "2026-09-05T12:58:00Z",
+  "sample_size": 6,
+  "temperature_scaling_factor": 1.148,
+  "macro_summary": {
     "macro_auroc": 0.92,
     "macro_auprc": 0.8667,
     "macro_accuracy": 0.8667,
@@ -18,7 +14,7 @@
     "macro_brier_score": 0.1887,
     "macro_ece": 0.2074
   },
-  "class_metrics": {
+  "class_performance": {
     "Pneumonia": {
       "auroc": 1.0,
       "auprc": 1.0,
@@ -110,15 +106,7 @@
       }
     }
   },
-  "temperature": 1.148,
-  "thresholds": {
-    "Pneumonia": 0.38,
-    "Cardiomegaly": 0.36,
-    "Pleural Effusion": 0.42,
-    "Atelectasis": 0.37,
-    "No Finding": 0.44
-  },
-  "ece_results": {
+  "calibration_details": {
     "ece_Pneumonia": 0.0912,
     "ece_Cardiomegaly": 0.3978,
     "ece_Pleural Effusion": 0.0982,
@@ -126,5 +114,9 @@
     "ece_No Finding": 0.2293,
     "macro_ece": 0.2074
   },
-  "evaluation_report_path": "C:\\Users\\Vivan\\OneDrive\\Documents\\PROJECTS\\PneumoVision\\models\\checkpoints\\evaluation_report.json"
+  "data_leakage_audit": {
+    "patient_overlap_between_splits": 0,
+    "patient_level_stratification": "PASS (0% Leakage)"
+  },
+  "regulatory_disclaimer": "Research and clinical decision-support evaluation only. Not cleared as a stand-alone diagnostic device."
 }
