@@ -206,10 +206,19 @@ class PneumoInferenceEngine:
                 )
                 heatmaps[cls_name] = cam_2d
 
-                loc_data = extract_heatmap_localization_data(cam_2d, image_shape=pil_img.size[::-1])
+                is_cls_pos = any(p["positive"] for p in predictions if p["label"] == cls_name)
                 
                 if save_heatmaps:
-                    overlay_img = overlay_heatmap_on_image(pil_img, cam_2d, alpha=0.55, threshold=0.36, draw_contours=True, draw_box=True)
+                    # Only draw bounding box / contours if condition is positive and abnormal
+                    should_draw = is_cls_pos and (cls_name != "No Finding")
+                    overlay_img = overlay_heatmap_on_image(
+                        pil_img,
+                        cam_2d,
+                        alpha=0.55 if should_draw else 0.25,
+                        threshold=0.38,
+                        draw_contours=should_draw,
+                        draw_box=should_draw
+                    )
                     side_by_side = create_side_by_side_comparison(pil_img, overlay_img, finding_title=cls_name)
 
                     fn_orig = f"{case_id}_original.png"
