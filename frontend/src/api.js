@@ -10,6 +10,12 @@ export async function fetchSystemHealth() {
   return res.json();
 }
 
+export async function fetchSamples() {
+  const res = await fetch(`${API_BASE}/samples`);
+  if (!res.ok) throw new Error('Failed to fetch test sample cases');
+  return res.json();
+}
+
 export async function analyzeImage(fileOrSampleId, { useTta = true, useMcDropout = true } = {}) {
   const formData = new FormData();
   if (typeof fileOrSampleId === 'string') {

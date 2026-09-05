@@ -5,9 +5,17 @@ Health and System Metadata Routes
 from fastapi import APIRouter
 import torch
 import json
-from src.config import TARGET_CLASSES, DEFAULT_THRESHOLDS, MODEL_CONFIG, CHECKPOINTS_DIR
+from src.config import TARGET_CLASSES, DEFAULT_THRESHOLDS, MODEL_CONFIG, CHECKPOINTS_DIR, SAMPLES_DIR
 
 router = APIRouter(prefix="/v1", tags=["Health"])
+
+@router.get("/samples")
+async def get_test_samples():
+    manifest_file = SAMPLES_DIR / "sample_manifest.json"
+    if manifest_file.exists():
+        with open(manifest_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
 
 @router.get("/health")
 async def health_check():

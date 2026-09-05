@@ -37,7 +37,8 @@ def test_pdf_report_generation(tmp_path):
     }
     
     structured = generate_structured_report(mock_analysis, clinician_notes="Test verified by Dr. Smith.")
-    assert "findings" in structured
+    assert "patient_friendly_summary" in structured
+    assert "technical_findings" in structured
     assert "impression" in structured
     
     out_pdf = tmp_path / "test_report.pdf"

@@ -62,3 +62,9 @@ data/raw_cohort/*
 .DS_Store
 Thumbs.db
 *.log
+
+# Runtime generated static files
+backend/static/heatmaps/*.png
+!backend/static/heatmaps/.gitkeep
+backend/static/reports/*.pdf
+!backend/static/reports/.gitkeep

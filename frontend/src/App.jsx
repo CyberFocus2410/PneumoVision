@@ -6,12 +6,13 @@ import FindingsPanel from './components/FindingsPanel';
 import LongitudinalTab from './components/LongitudinalTab';
 import ReportModal from './components/ReportModal';
 import AuditDrawer from './components/AuditDrawer';
-import { fetchSystemHealth, analyzeImage } from './api';
+import { fetchSystemHealth, fetchSamples, analyzeImage } from './api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('single');
   const [theme, setTheme] = useState('dark');
   const [healthData, setHealthData] = useState(null);
+  const [samplesList, setSamplesList] = useState([]);
   const [selectedSample, setSelectedSample] = useState('sample_pneumonia');
   const [analysisResult, setAnalysisResult] = useState(null);
   const [selectedFinding, setSelectedFinding] = useState(null);
@@ -19,7 +20,6 @@ export default function App() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showAuditDrawer, setShowAuditDrawer] = useState(false);
 
-  // Load health & initial benchmark sample
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
@@ -29,8 +29,17 @@ export default function App() {
       .then((data) => setHealthData(data))
       .catch((err) => console.error('Health check failed:', err));
 
-    // Analyze default sample on boot
-    handleSelectSample('sample_pneumonia');
+    fetchSamples()
+      .then((data) => {
+        setSamplesList(data);
+        if (data.length > 0) {
+          handleSelectSample(data[0].id);
+        }
+      })
+      .catch((err) => {
+        console.error('Fetch samples error:', err);
+        handleSelectSample('sample_pneumonia');
+      });
   }, []);
 
   const handleSelectSample = async (sampleId) => {
@@ -75,9 +84,10 @@ export default function App() {
       />
 
       {activeTab === 'single' ? (
-        <main className="dashboard-grid">
-          {/* Left Column: Upload & Sample Ingestion */}
+        <main className="pacs-workspace-grid">
+          {/* Left Column: Patient Worklist & Acquisition */}
           <UploadPanel
+            samples={samplesList}
             onSelectSample={handleSelectSample}
             onUploadFile={handleUploadFile}
             selectedSample={selectedSample}
@@ -86,14 +96,14 @@ export default function App() {
             qualityMetrics={analysisResult?.quality_metrics}
           />
 
-          {/* Center Column: High-Fidelity Radiograph & Grad-CAM Viewport */}
+          {/* Center Column: Multi-View Radiologist Viewport */}
           <DicomViewer
             analysisResult={analysisResult}
             selectedFinding={selectedFinding}
             setSelectedFinding={setSelectedFinding}
           />
 
-          {/* Right Column: Quantitative Calibrated Findings */}
+          {/* Right Column: Dual-Mode Intelligence Panel (Patient vs Clinician) */}
           <FindingsPanel
             analysisResult={analysisResult}
             selectedFinding={selectedFinding}
@@ -102,10 +112,12 @@ export default function App() {
           />
         </main>
       ) : (
-        <LongitudinalTab />
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <LongitudinalTab />
+        </div>
       )}
 
-      {/* Structured Report Modal */}
+      {/* Dual-Mode Report Modal */}
       {showReportModal && (
         <ReportModal
           analysisResult={analysisResult}

@@ -22,7 +22,9 @@ from src.preprocessing.dicom_handler import read_dicom_file, is_dicom_file
 from src.models.densenet import PneumoDenseNet
 from src.models.calibration import ModelWithTemperature
 from src.explainability.gradcam import PneumoGradCAM
-from src.explainability.visualizer import overlay_heatmap_on_image, create_side_by_side_comparison
+from src.explainability.visualizer import (
+    overlay_heatmap_on_image, create_side_by_side_comparison, extract_heatmap_localization_data
+)
 
 class PneumoInferenceEngine:
     def __init__(
@@ -198,8 +200,10 @@ class PneumoInferenceEngine:
                 cam_2d = self.gradcam.generate_heatmap(tensor_img, target_class_idx=idx, use_gradcam_plusplus=True)
                 heatmaps[cls_name] = cam_2d
 
+                loc_data = extract_heatmap_localization_data(cam_2d, image_shape=pil_img.size[::-1])
+                
                 if save_heatmaps:
-                    overlay_img = overlay_heatmap_on_image(pil_img, cam_2d, alpha=0.45)
+                    overlay_img = overlay_heatmap_on_image(pil_img, cam_2d, alpha=0.48, draw_contours=True, draw_box=True)
                     side_by_side = create_side_by_side_comparison(pil_img, overlay_img, finding_title=cls_name)
 
                     fn_overlay = f"{case_id}_{cls_name.lower().replace(' ', '_')}_overlay.png"
@@ -215,7 +219,8 @@ class PneumoInferenceEngine:
                         "overlay_url": f"/static/heatmaps/{fn_overlay}",
                         "side_url": f"/static/heatmaps/{fn_side}",
                         "overlay_path": str(overlay_path),
-                        "side_path": str(side_path)
+                        "side_path": str(side_path),
+                        "localization": loc_data
                     }
             except Exception as cam_err:
                 print(f"Warning: GradCAM failed for {cls_name}: {cam_err}")

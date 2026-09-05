@@ -1,151 +1,204 @@
 import React, { useState } from 'react';
-import { Eye, ZoomIn, ZoomOut, RotateCcw, Sliders, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
+import {
+  Eye, ZoomIn, ZoomOut, RotateCcw, Sliders, Layers, Sparkles,
+  Image as ImageIcon, Crosshair, HelpCircle, MapPin, Maximize2
+} from 'lucide-react';
+
+const WINDOW_PRESETS = [
+  { name: 'Standard CXR', brightness: 100, contrast: 100 },
+  { name: 'Lung Window', brightness: 115, contrast: 140 },
+  { name: 'Mediastinum', brightness: 90, contrast: 160 },
+  { name: 'Soft Tissue', brightness: 105, contrast: 120 }
+];
 
 export default function DicomViewer({
   analysisResult,
   selectedFinding,
   setSelectedFinding
 }) {
-  const [viewMode, setViewMode] = useState('overlay'); // 'original', 'overlay', 'side'
+  const [viewMode, setViewMode] = useState('overlay'); // 'overlay', 'side', 'original'
   const [zoom, setZoom] = useState(1.0);
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [inverted, setInverted] = useState(false);
-  const [opacity, setOpacity] = useState(0.45);
+  const [showGuide, setShowGuide] = useState(true);
+  const [showCrosshair, setShowCrosshair] = useState(false);
 
   const heatmaps = analysisResult?.heatmaps || {};
   const activeFinding = selectedFinding || analysisResult?.primary_finding || Object.keys(heatmaps)[0];
   const activeHeatmapData = heatmaps[activeFinding];
+  const locData = activeHeatmapData?.localization;
 
   // Resolve Image URL based on view mode
   let displayUrl = null;
-  if (viewMode === 'original' || !activeHeatmapData) {
-    displayUrl = activeHeatmapData?.overlay_url ? activeHeatmapData.overlay_url.replace('_overlay.png', '_side.png') : null;
-    // Fallback: we will use overlay or original
-    displayUrl = activeHeatmapData?.overlay_url || null;
-  } else if (viewMode === 'side') {
+  if (viewMode === 'side') {
     displayUrl = activeHeatmapData?.side_url;
   } else {
     displayUrl = activeHeatmapData?.overlay_url;
   }
+
+  const applyPreset = (preset) => {
+    setBrightness(preset.brightness);
+    setContrast(preset.contrast);
+  };
 
   const resetControls = () => {
     setZoom(1.0);
     setBrightness(100);
     setContrast(100);
     setInverted(false);
-    setOpacity(0.45);
   };
 
   return (
-    <div className="clinical-card viewer-card">
-      <div className="card-title-row">
-        <span className="card-title">
-          <Eye size={16} /> Radiologic Diagnostic Viewport
-        </span>
-        {activeFinding && (
-          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--cyan-primary)' }}>
-            Active CAM Target: <b>{activeFinding}</b>
-          </span>
-        )}
-      </div>
-
-      {/* Toolbar */}
-      <div className="viewer-toolbar">
-        {/* View Mode Toggle */}
-        <div className="toolbar-group">
+    <div className="pacs-viewport-center">
+      {/* Viewport Action Toolbar */}
+      <div className="pacs-toolbar">
+        {/* View Mode */}
+        <div className="toolbar-btn-group">
           <button
-            className={`tool-btn ${viewMode === 'overlay' ? 'active' : ''}`}
+            className={`pacs-tool-btn ${viewMode === 'overlay' ? 'active' : ''}`}
             onClick={() => setViewMode('overlay')}
           >
-            <Sparkles size={13} /> Grad-CAM++
+            <Sparkles size={13} /> Grad-CAM++ Focus
           </button>
           <button
-            className={`tool-btn ${viewMode === 'side' ? 'active' : ''}`}
+            className={`pacs-tool-btn ${viewMode === 'side' ? 'active' : ''}`}
             onClick={() => setViewMode('side')}
           >
-            <Layers size={13} /> Side-by-Side
+            <Layers size={13} /> Synchronized Split
           </button>
         </div>
 
-        {/* Heatmap Finding Selection if multiple available */}
+        {/* Finding Layer Selector */}
         {Object.keys(heatmaps).length > 1 && (
-          <div className="toolbar-group">
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Layer:</span>
-            {Object.keys(heatmaps).map((findingName) => (
+          <div className="toolbar-btn-group">
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Layer:</span>
+            {Object.keys(heatmaps).map((fName) => (
               <button
-                key={findingName}
-                className={`tool-btn ${activeFinding === findingName ? 'active' : ''}`}
-                onClick={() => setSelectedFinding(findingName)}
+                key={fName}
+                className={`pacs-tool-btn ${activeFinding === fName ? 'active' : ''}`}
+                onClick={() => setSelectedFinding(fName)}
               >
-                {findingName}
+                {fName}
               </button>
             ))}
           </div>
         )}
 
-        {/* Zoom & Image Processing Tools */}
-        <div className="toolbar-group">
-          <button className="tool-btn" onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))} title="Zoom In">
+        {/* Windowing Presets */}
+        <div className="toolbar-btn-group">
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Window:</span>
+          {WINDOW_PRESETS.map((p) => (
+            <button
+              key={p.name}
+              className="pacs-tool-btn"
+              style={{ fontSize: '0.68rem', padding: '3px 8px' }}
+              onClick={() => applyPreset(p)}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Zoom & Canvas Adjustments */}
+        <div className="toolbar-btn-group">
+          <button className="pacs-tool-btn" onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))} title="Zoom In">
             <ZoomIn size={13} />
           </button>
-          <button className="tool-btn" onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))} title="Zoom Out">
+          <button className="pacs-tool-btn" onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))} title="Zoom Out">
             <ZoomOut size={13} />
           </button>
           <button
-            className={`tool-btn ${inverted ? 'active' : ''}`}
+            className={`pacs-tool-btn ${inverted ? 'active' : ''}`}
             onClick={() => setInverted((inv) => !inv)}
-            title="Invert Presentation (MONOCHROME1/2)"
+            title="Invert Presentation"
           >
             Invert
           </button>
-          <button className="tool-btn" onClick={resetControls} title="Reset Viewport">
+          <button
+            className={`pacs-tool-btn ${showCrosshair ? 'active' : ''}`}
+            onClick={() => setShowCrosshair((c) => !c)}
+            title="Toggle Center Crosshair"
+          >
+            <Crosshair size={13} />
+          </button>
+          <button className="pacs-tool-btn" onClick={resetControls} title="Reset">
             <RotateCcw size={13} />
           </button>
         </div>
       </div>
 
-      {/* Canvas Viewport */}
-      <div className="viewport-canvas-container">
+      {/* Main Radiograph Canvas */}
+      <div className="pacs-canvas-wrapper">
         {displayUrl ? (
-          <img
-            src={displayUrl}
-            alt="Radiograph Viewport"
-            className="radiograph-img"
-            style={{
-              transform: `scale(${zoom})`,
-              filter: `brightness(${brightness}%) contrast(${contrast}%) ${inverted ? 'invert(1)' : ''}`,
-            }}
-          />
+          <>
+            <img
+              src={displayUrl}
+              alt="Radiograph Viewport"
+              className="pacs-radiograph-view"
+              style={{
+                transform: `scale(${zoom})`,
+                filter: `brightness(${brightness}%) contrast(${contrast}%) ${inverted ? 'invert(1)' : ''}`,
+              }}
+            />
+
+            {/* Crosshair Overlay */}
+            {showCrosshair && (
+              <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <div style={{ position: 'absolute', width: '100%', height: '1px', background: 'rgba(6, 182, 212, 0.3)' }} />
+                <div style={{ position: 'absolute', height: '100%', width: '1px', background: 'rgba(6, 182, 212, 0.3)' }} />
+              </div>
+            )}
+
+            {/* Floating Heatmap Interpretation Guide */}
+            {showGuide && (
+              <div className="heatmap-floating-guide">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    AI Visual Attention Map
+                  </span>
+                  <button
+                    onClick={() => setShowGuide(false)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.65rem' }}
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="heatmap-color-scale-bar" />
+                <div className="heatmap-scale-labels">
+                  <span>Normal / Background</span>
+                  <span>Moderate</span>
+                  <span style={{ color: '#f87171', fontWeight: 700 }}>Peak Focus &gt;80%</span>
+                </div>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
+                  <b>Red/Yellow zones</b> highlight the precise image pixels the deep neural network used to identify pathology.
+                </p>
+              </div>
+            )}
+
+            {/* Anatomical Landmark Focus Tag */}
+            {locData && (
+              <div className="anatomical-focus-pill">
+                <MapPin size={13} color="#38bdf8" />
+                <span>Attention Focus: {locData.anatomical_site}</span>
+              </div>
+            )}
+          </>
         ) : (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
-            <ImageIcon size={48} style={{ opacity: 0.3, margin: '0 auto 12px' }} />
-            <p style={{ fontSize: '0.85rem' }}>Select or upload a study to display radiograph</p>
-          </div>
-        )}
-
-        {/* Live Heatmap Opacity Controls */}
-        {viewMode === 'overlay' && displayUrl && (
-          <div className="viewport-overlay-slider">
-            <span>CAM Blend:</span>
-            <input
-              type="range"
-              min="0.1"
-              max="1.0"
-              step="0.05"
-              value={opacity}
-              onChange={(e) => setOpacity(parseFloat(e.target.value))}
-              style={{ width: '90px', cursor: 'pointer', accentColor: 'var(--cyan-primary)' }}
-            />
-            <span>{Math.round(opacity * 100)}%</span>
+            <ImageIcon size={44} style={{ opacity: 0.3, margin: '0 auto 8px' }} />
+            <p style={{ fontSize: '0.8rem' }}>Select a patient case or upload an X-ray to inspect</p>
           </div>
         )}
       </div>
 
-      {/* Window Level Controls */}
-      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
-        <Sliders size={14} color="var(--text-muted)" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+      {/* Manual Fine Sliders */}
+      <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-card)', padding: '6px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+        <Sliders size={13} color="var(--text-muted)" style={{ marginTop: '3px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
           <span>Brightness:</span>
           <input
             type="range"
@@ -157,7 +210,7 @@ export default function DicomViewer({
           />
           <span style={{ fontFamily: 'var(--font-mono)' }}>{brightness}%</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
           <span>Contrast:</span>
           <input
             type="range"
