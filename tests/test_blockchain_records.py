@@ -150,3 +150,124 @@ def test_tamper_detection_on_hash_mismatch():
     assert record["integrity_valid"] is False
     assert record["tamper_detected"] is True
     assert record["tamper_warning"] is not None
+
+
+def test_full_care_timeline_sequence():
+    """
+    Tests complete care timeline:
+    Diagnosis -> Treatment -> Medication -> Outcome
+    Verifies:
+    1. Each record is hash-verified on-chain with proper RecordType.
+    2. Chronological sequence is retrieved with all 4 record types.
+    3. Off-chain database payloads match on-chain cryptographic digests.
+    4. Lineage linking (Diagnosis -> Treatment/Medication -> Outcome) is preserved.
+    """
+    patient_id = "PATIENT_FULL_CARE_TIMELINE_04"
+
+    # Step 1: Diagnosis (via /analyze)
+    diag_res = client.post(
+        "/v1/analyze",
+        data={"sample_id": "sample_pneumonia", "patient_id": patient_id}
+    )
+    assert diag_res.status_code == 200
+    diag_data = diag_res.json()
+    diag_ref = diag_data["off_chain_ref"]
+    assert diag_data["blockchain_status"] == "COMMITTED"
+    assert diag_data["blockchain_tx_hash"] is not None
+
+    # Step 2: Treatment (linked to Diagnosis)
+    treat_res = client.post(
+        f"/v1/records/{patient_id}/treatment",
+        json={
+            "treatment_description": "Empiric Broad-Spectrum Antibiotic Therapy & Supplemental O2",
+            "diagnosis_ref": diag_ref,
+            "treatment_type": "Inpatient Protocol",
+            "notes": "Patient admitted with moderate right lung infiltrates. Commencing IV hydration."
+        }
+    )
+    assert treat_res.status_code == 200
+    treat_data = treat_res.json()
+    treat_ref = treat_data["off_chain_ref"]
+    assert treat_data["status"] == "success"
+    assert treat_data["record_type"] == "Treatment"
+    assert treat_data["diagnosis_ref"] == diag_ref
+    assert treat_data["blockchain_tx_hash"] is not None
+
+    # Step 3: Medication (linked to Diagnosis and Treatment)
+    med_res = client.post(
+        f"/v1/records/{patient_id}/medication",
+        json={
+            "medicine_name": "Azithromycin + Ceftriaxone",
+            "dosage": "500mg IV daily",
+            "duration": "7 days",
+            "frequency": "Once daily",
+            "diagnosis_ref": diag_ref,
+            "treatment_ref": treat_ref,
+            "instructions": "Administer IV infusion over 60 minutes after meals."
+        }
+    )
+    assert med_res.status_code == 200
+    med_data = med_res.json()
+    med_ref = med_data["off_chain_ref"]
+    assert med_data["status"] == "success"
+    assert med_data["record_type"] == "Medication"
+    assert med_data["diagnosis_ref"] == diag_ref
+    assert med_data["treatment_ref"] == treat_ref
+    assert med_data["blockchain_tx_hash"] is not None
+
+    # Step 4: Outcome / Reaction (linked to Treatment and Medication)
+    out_res = client.post(
+        f"/v1/records/{patient_id}/outcome",
+        json={
+            "outcome_description": "Marked clinical improvement, fever subsiding, bilateral lung fields clearing.",
+            "time_to_response": "72 hours",
+            "treatment_ref": treat_ref,
+            "medication_ref": med_ref,
+            "patient_status": "Recovered / Ambulatory",
+            "notes": "Follow-up chest radiograph recommended at 4 weeks post-discharge."
+        }
+    )
+    assert out_res.status_code == 200
+    out_data = out_res.json()
+    assert out_data["status"] == "success"
+    assert out_data["record_type"] == "Outcome"
+    assert out_data["treatment_ref"] == treat_ref
+    assert out_data["medication_ref"] == med_ref
+    assert out_data["blockchain_tx_hash"] is not None
+
+    # Step 5: Fetch Full Care Timeline History via /records/{patientId}
+    timeline_res = client.get(f"/v1/records/{patient_id}")
+    assert timeline_res.status_code == 200
+    timeline_data = timeline_res.json()
+
+    assert timeline_data["status"] == "success"
+    assert timeline_data["total_records"] == 4
+    assert timeline_data["tamper_detected"] is False
+    assert timeline_data["tamper_warnings"] is None
+
+    records = timeline_data["records"]
+    assert len(records) == 4
+
+    # Verify chronological sequence & record types
+    record_types = [r["record_type"] for r in records]
+    assert record_types == ["Diagnosis", "Treatment", "Medication", "Outcome"]
+
+    # Verify all records have valid cryptographic integrity
+    for r in records:
+        assert r["integrity_valid"] is True
+        assert r["tamper_detected"] is False
+        assert r["on_chain_hash"].startswith("0x")
+        assert len(r["on_chain_hash"]) == 66
+
+    # Verify lineage links across the full timeline
+    rec_diag = records[0]
+    rec_treat = records[1]
+    rec_med = records[2]
+    rec_out = records[3]
+
+    assert rec_treat["linked_diagnosis_ref"] == diag_ref
+    assert rec_med["linked_diagnosis_ref"] == diag_ref
+    assert rec_med["linked_treatment_ref"] == treat_ref
+    assert rec_out["linked_treatment_ref"] == treat_ref
+    assert rec_out["linked_medication_ref"] == med_ref
+
