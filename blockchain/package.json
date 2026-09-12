@@ -1,0 +1,14 @@
+{
+  "name": "pneumovision-blockchain",
+  "version": "1.0.0",
+  "description": "PneumoVision Blockchain Patient Records Smart Contract",
+  "scripts": {
+    "test": "hardhat test",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.js --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  }
+}
