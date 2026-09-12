@@ -28,3 +28,6 @@ seaborn>=0.13.0
 # Experiment Tracking & Metrics
 tqdm>=4.66.0
 pytest>=8.0.0
+
+# Remote Execution & Cloud Compute
+kaggle>=2.2.0
