@@ -6,19 +6,19 @@ from typing import Optional, List
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from src.config import TARGET_CLASSES, MODEL_CONFIG
+from src.config import MODEL_OUTPUT_CLASSES, TARGET_CLASSES, MODEL_CONFIG
 
 class PneumoDenseNet(nn.Module):
     """
-    Multi-label Chest X-Ray classifier based on DenseNet-121 architecture.
+    Chest X-Ray classifier based on DenseNet-121 architecture.
     Features:
     - Pretrained feature extractor
     - 2-stage MLP classification head with Dropout regularization
-    - Logits return or Sigmoid probability output for 5 target findings
+    - Supports binary (1 sigmoid output) and multi-label modes
     """
     def __init__(
         self,
-        num_classes: int = len(TARGET_CLASSES),
+        num_classes: int = len(MODEL_OUTPUT_CLASSES),
         pretrained: bool = True,
         dropout_rate: float = 0.3,
         hidden_dim: int = 256
