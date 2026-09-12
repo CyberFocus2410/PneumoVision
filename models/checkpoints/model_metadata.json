@@ -1,130 +1,18 @@
 {
-  "model_name": "PneumoDenseNet121",
+  "model_name": "PneumoDenseNet121_KaggleGPU",
   "target_classes": [
-    "Pneumonia",
-    "Cardiomegaly",
-    "Pleural Effusion",
-    "Atelectasis",
-    "No Finding"
+    "Pneumonia"
   ],
-  "metrics": {
-    "macro_auroc": 0.92,
-    "macro_auprc": 0.8667,
-    "macro_accuracy": 0.8667,
-    "macro_sensitivity": 1.0,
-    "macro_specificity": 0.83,
-    "macro_precision": 0.7,
-    "macro_f1": 0.7933,
-    "macro_brier_score": 0.1887,
-    "macro_ece": 0.2074
-  },
-  "class_metrics": {
+  "best_val_auroc": 0.9996666333299997,
+  "temperature": 1.0,
+  "thresholds": {
     "Pneumonia": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.75,
-      "precision_ppv": 0.6667,
-      "npv": 1.0,
-      "accuracy": 0.8333,
-      "f1_score": 0.8,
-      "brier_score": 0.2171,
-      "operating_threshold": 0.42,
-      "confusion_matrix": {
-        "tp": 2,
-        "fp": 1,
-        "tn": 3,
-        "fn": 0
-      }
-    },
-    "Cardiomegaly": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 1.0,
-      "precision_ppv": 1.0,
-      "npv": 1.0,
-      "accuracy": 1.0,
-      "f1_score": 1.0,
-      "brier_score": 0.1615,
-      "operating_threshold": 0.4,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 0,
-        "tn": 5,
-        "fn": 0
-      }
-    },
-    "Pleural Effusion": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 1.0,
-      "precision_ppv": 1.0,
-      "npv": 1.0,
-      "accuracy": 1.0,
-      "f1_score": 1.0,
-      "brier_score": 0.1938,
-      "operating_threshold": 0.42,
-      "confusion_matrix": {
-        "tp": 2,
-        "fp": 0,
-        "tn": 4,
-        "fn": 0
-      }
-    },
-    "Atelectasis": {
-      "auroc": 0.6,
-      "auprc": 0.3333,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.6,
-      "precision_ppv": 0.3333,
-      "npv": 1.0,
-      "accuracy": 0.6667,
-      "f1_score": 0.5,
-      "brier_score": 0.1858,
-      "operating_threshold": 0.39,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 2,
-        "tn": 3,
-        "fn": 0
-      }
-    },
-    "No Finding": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.8,
-      "precision_ppv": 0.5,
-      "npv": 1.0,
-      "accuracy": 0.8333,
-      "f1_score": 0.6667,
-      "brier_score": 0.1854,
-      "operating_threshold": 0.41,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 1,
-        "tn": 4,
-        "fn": 0
-      }
+      "threshold": 0.51,
+      "f1": 0.9983,
+      "precision": 0.9983,
+      "recall": 0.9983
     }
   },
-  "temperature": 1.148,
-  "thresholds": {
-    "Pneumonia": 0.38,
-    "Cardiomegaly": 0.36,
-    "Pleural Effusion": 0.42,
-    "Atelectasis": 0.37,
-    "No Finding": 0.44
-  },
-  "ece_results": {
-    "ece_Pneumonia": 0.0912,
-    "ece_Cardiomegaly": 0.3978,
-    "ece_Pleural Effusion": 0.0982,
-    "ece_Atelectasis": 0.2204,
-    "ece_No Finding": 0.2293,
-    "macro_ece": 0.2074
-  },
-  "evaluation_report_path": "C:\\Users\\Vivan\\OneDrive\\Documents\\PROJECTS\\PneumoVision\\models\\checkpoints\\evaluation_report.json"
+  "epochs": 8,
+  "final_val_loss": 0.0050400625484229526
 }

@@ -1,122 +1,35 @@
 {
-  "model_architecture": "DenseNet-121 (Multi-Label)",
-  "evaluation_timestamp": "2026-09-05T12:58:00Z",
-  "sample_size": 6,
-  "temperature_scaling_factor": 1.148,
-  "macro_summary": {
-    "macro_auroc": 0.92,
-    "macro_auprc": 0.8667,
-    "macro_accuracy": 0.8667,
-    "macro_sensitivity": 1.0,
-    "macro_specificity": 0.83,
-    "macro_precision": 0.7,
-    "macro_f1": 0.7933,
-    "macro_brier_score": 0.1887,
-    "macro_ece": 0.2074
-  },
-  "class_performance": {
-    "Pneumonia": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.75,
-      "precision_ppv": 0.6667,
-      "npv": 1.0,
-      "accuracy": 0.8333,
-      "f1_score": 0.8,
-      "brier_score": 0.2171,
-      "operating_threshold": 0.42,
-      "confusion_matrix": {
-        "tp": 2,
-        "fp": 1,
-        "tn": 3,
-        "fn": 0
-      }
-    },
-    "Cardiomegaly": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 1.0,
-      "precision_ppv": 1.0,
-      "npv": 1.0,
-      "accuracy": 1.0,
-      "f1_score": 1.0,
-      "brier_score": 0.1615,
-      "operating_threshold": 0.4,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 0,
-        "tn": 5,
-        "fn": 0
-      }
-    },
-    "Pleural Effusion": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 1.0,
-      "precision_ppv": 1.0,
-      "npv": 1.0,
-      "accuracy": 1.0,
-      "f1_score": 1.0,
-      "brier_score": 0.1938,
-      "operating_threshold": 0.42,
-      "confusion_matrix": {
-        "tp": 2,
-        "fp": 0,
-        "tn": 4,
-        "fn": 0
-      }
-    },
-    "Atelectasis": {
-      "auroc": 0.6,
-      "auprc": 0.3333,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.6,
-      "precision_ppv": 0.3333,
-      "npv": 1.0,
-      "accuracy": 0.6667,
-      "f1_score": 0.5,
-      "brier_score": 0.1858,
-      "operating_threshold": 0.39,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 2,
-        "tn": 3,
-        "fn": 0
-      }
-    },
-    "No Finding": {
-      "auroc": 1.0,
-      "auprc": 1.0,
-      "sensitivity_recall": 1.0,
-      "specificity": 0.8,
-      "precision_ppv": 0.5,
-      "npv": 1.0,
-      "accuracy": 0.8333,
-      "f1_score": 0.6667,
-      "brier_score": 0.1854,
-      "operating_threshold": 0.41,
-      "confusion_matrix": {
-        "tp": 1,
-        "fp": 1,
-        "tn": 4,
-        "fn": 0
-      }
+  "model_architecture": "DenseNet-121 (Binary)",
+  "task": "Binary Pneumonia Screener",
+  "dataset": "Kaggle Chest X-Ray Images (Pneumonia)",
+  "evaluation_timestamp": "2026-09-12T17:24:21.878461",
+  "checkpoint_file": "C:\\Users\\Vivan\\OneDrive\\Documents\\PROJECTS\\PneumoVision\\models\\checkpoints\\best_model.pt",
+  "sample_size": 2,
+  "temperature": 1.0,
+  "metrics": {
+    "auroc": 0.9707,
+    "pr_auc": 0.9765,
+    "sensitivity": 0.9974,
+    "specificity": 0.4744,
+    "precision": 0.7598,
+    "recall": 0.9974,
+    "f1": 0.8625,
+    "accuracy": 0.8013,
+    "npv": 0.9911,
+    "brier_score": 0.0894,
+    "ece": 0.0342,
+    "operating_threshold": 0.51,
+    "confusion_matrix": {
+      "tp": 389,
+      "fp": 123,
+      "tn": 111,
+      "fn": 1,
+      "total": 624
     }
   },
-  "calibration_details": {
-    "ece_Pneumonia": 0.0912,
-    "ece_Cardiomegaly": 0.3978,
-    "ece_Pleural Effusion": 0.0982,
-    "ece_Atelectasis": 0.2204,
-    "ece_No Finding": 0.2293,
-    "macro_ece": 0.2074
-  },
-  "data_leakage_audit": {
-    "patient_overlap_between_splits": 0,
-    "patient_level_stratification": "PASS (0% Leakage)"
-  },
-  "regulatory_disclaimer": "Research and clinical decision-support evaluation only. Not cleared as a stand-alone diagnostic device."
+  "dataset_limitations": {
+    "single_institution": "Guangzhou Women and Children's Medical Center",
+    "pediatric_only": "Patients aged 1 to 5 years old",
+    "shortcut_risks": "AP vs PA projection discrepancies and exposure variations"
+  }
 }
