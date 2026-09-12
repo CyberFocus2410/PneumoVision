@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ==========================================================================
    PneumoVision Diagnostic PACS & Clinical Workstation Design System
    Meticulously engineered for authentic radiologist & patient interaction
