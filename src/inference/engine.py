@@ -2,19 +2,26 @@
 Inference Engine for PneumoVision
 Integrates Quality Assessor, Temperature-Calibrated DenseNet121,
 Test-Time Augmentation (TTA), MC-Dropout Uncertainty, and Grad-CAM++ Generator.
+Supports binary single-output mode (Pneumonia + complement No Finding) and multi-label mode.
 """
 
 from typing import Dict, List, Optional, Tuple, Any, Union
 from pathlib import Path
 import uuid
+import json
 import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
 
 from src.config import (
-    TARGET_CLASSES, DEFAULT_THRESHOLDS, CHECKPOINTS_DIR, HEATMAPS_DIR,
-    MODEL_CONFIG
+    TARGET_CLASSES,
+    MODEL_OUTPUT_CLASSES,
+    DEFAULT_THRESHOLDS,
+    CHECKPOINTS_DIR,
+    HEATMAPS_DIR,
+    MODEL_CONFIG,
+    LABEL_MODE,
 )
 from src.preprocessing.quality_check import assess_image_quality
 from src.preprocessing.transforms import get_inference_transforms, get_training_transforms
@@ -26,6 +33,7 @@ from src.explainability.visualizer import (
     overlay_heatmap_on_image, create_side_by_side_comparison, extract_heatmap_localization_data
 )
 
+
 class PneumoInferenceEngine:
     def __init__(
         self,
@@ -33,38 +41,69 @@ class PneumoInferenceEngine:
         device: Optional[torch.device] = None
     ):
         self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
-        self.target_classes = TARGET_CLASSES
-        self.thresholds = DEFAULT_THRESHOLDS.copy()
-        self.temperature = 1.15
         self.model_version = MODEL_CONFIG["version"]
+        self.temperature = 1.0
+        self.thresholds = dict(DEFAULT_THRESHOLDS)
 
-        # Instantiate DenseNet121 backbone
-        base_model = PneumoDenseNet(num_classes=len(self.target_classes), pretrained=True)
-        self.model = ModelWithTemperature(base_model, initial_temperature=self.temperature)
-
-        # Load weights if checkpoint exists
+        # 1. Inspect checkpoint to detect output shape
         ck_path = Path(checkpoint_path) if checkpoint_path else (CHECKPOINTS_DIR / "best_model.pt")
+        ckpt = None
+        num_classes = len(MODEL_OUTPUT_CLASSES)  # Default 1 in binary mode
+
         if ck_path.exists():
             try:
                 ckpt = torch.load(ck_path, map_location=self.device)
-                if "model_state_dict" in ckpt:
-                    self.model.model.load_state_dict(ckpt["model_state_dict"], strict=False)
-                if "temperature" in ckpt:
+                sd = ckpt.get("model_state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
+                if isinstance(sd, dict) and "classifier.4.weight" in sd:
+                    num_classes = sd["classifier.4.weight"].shape[0]
+            except Exception as e:
+                print(f"Warning: Could not pre-read checkpoint from {ck_path}: {e}")
+
+        # Check metadata JSON for temperature and thresholds
+        meta_path = CHECKPOINTS_DIR / "model_metadata.json"
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if "temperature" in meta:
+                        self.temperature = float(meta["temperature"])
+                    if "thresholds" in meta and isinstance(meta["thresholds"], dict):
+                        for k, v in meta["thresholds"].items():
+                            if isinstance(v, dict) and "threshold" in v:
+                                self.thresholds[k] = float(v["threshold"])
+                            elif isinstance(v, (int, float)):
+                                self.thresholds[k] = float(v)
+            except Exception as e:
+                print(f"Warning: Could not read metadata from {meta_path}: {e}")
+
+        self.num_output_classes = num_classes
+        if self.num_output_classes == 1:
+            self.target_classes = ["Pneumonia", "No Finding"]
+            if "No Finding" not in self.thresholds:
+                pna_th = self.thresholds.get("Pneumonia", 0.51)
+                self.thresholds["No Finding"] = round(1.0 - pna_th, 2)
+        else:
+            self.target_classes = list(TARGET_CLASSES)
+
+        # 2. Instantiate backbone and temperature scaling wrapper
+        base_model = PneumoDenseNet(num_classes=self.num_output_classes, pretrained=False)
+        self.model = ModelWithTemperature(base_model, initial_temperature=self.temperature)
+
+        # 3. Load checkpoint weights
+        if ckpt is not None:
+            try:
+                state_dict = ckpt.get("model_state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
+                self.model.model.load_state_dict(state_dict, strict=False)
+                if isinstance(ckpt, dict) and "temperature" in ckpt:
                     self.temperature = float(ckpt["temperature"])
                     self.model.set_temperature(self.temperature)
-                if "thresholds" in ckpt and isinstance(ckpt["thresholds"], dict):
-                    for k, v in ckpt["thresholds"].items():
-                        if isinstance(v, dict) and "threshold" in v:
-                            self.thresholds[k] = v["threshold"]
-                        elif isinstance(v, (int, float)):
-                            self.thresholds[k] = float(v)
             except Exception as e:
-                print(f"Warning: Could not load checkpoint from {ck_path}: {e}")
+                print(f"Warning: Could not load checkpoint weights from {ck_path}: {e}")
 
         self.model.to(self.device)
         self.model.eval()
 
-        # Setup Grad-CAM explainability engine
+        # 4. Setup Grad-CAM explainability engine
         self.gradcam = PneumoGradCAM(self.model.model)
         self.transform = get_inference_transforms(apply_clahe=True)
 
@@ -93,7 +132,7 @@ class PneumoInferenceEngine:
         save_heatmaps: bool = True
     ) -> Dict[str, Any]:
         """
-        Executes end-to-end multi-label analysis with calibrated uncertainty and explainability.
+        Executes end-to-end analysis with calibrated uncertainty and Grad-CAM++ explainability.
         """
         dicom_metadata = None
         case_id = str(uuid.uuid4())[:8]
@@ -133,7 +172,17 @@ class PneumoInferenceEngine:
         self.model.eval()
         with torch.no_grad():
             scaled_logits = self.model(tensor_img, return_logits=True)
-            base_probs = torch.sigmoid(scaled_logits).squeeze(0).cpu().numpy()
+            raw_probs = torch.sigmoid(scaled_logits).squeeze(0).cpu().numpy()
+            if raw_probs.ndim == 0:
+                raw_probs = np.array([float(raw_probs)])
+
+        # Construct probabilities
+        if self.num_output_classes == 1:
+            p_pna = float(raw_probs[0])
+            p_norm = float(1.0 - p_pna)
+            base_probs = [p_pna, p_norm]
+        else:
+            base_probs = [float(p) for p in raw_probs]
 
         uncertainties = np.zeros(len(self.target_classes))
         
@@ -147,8 +196,14 @@ class PneumoInferenceEngine:
             with torch.no_grad():
                 for _ in range(5):
                     logits_mc = self.model(tensor_img, return_logits=True)
-                    probs_mc = torch.sigmoid(logits_mc).squeeze(0).cpu().numpy()
-                    mc_probs.append(probs_mc)
+                    pm = torch.sigmoid(logits_mc).squeeze(0).cpu().numpy()
+                    if pm.ndim == 0:
+                        pm = np.array([float(pm)])
+                    if self.num_output_classes == 1:
+                        p_mc_pna = float(pm[0])
+                        mc_probs.append([p_mc_pna, 1.0 - p_mc_pna])
+                    else:
+                        mc_probs.append([float(x) for x in pm])
 
             uncertainties = np.std(np.stack(mc_probs), axis=0)
             self.model.eval()
@@ -159,8 +214,8 @@ class PneumoInferenceEngine:
 
         for idx, cls_name in enumerate(self.target_classes):
             prob = float(base_probs[idx])
-            th = float(self.thresholds.get(cls_name, 0.5))
-            unc = float(uncertainties[idx])
+            th = float(self.thresholds.get(cls_name, 0.51 if cls_name == "Pneumonia" else 0.49))
+            unc = float(uncertainties[idx]) if idx < len(uncertainties) else 0.0
             is_pos = bool(prob >= th)
 
             band, note = self._determine_confidence_band(prob, th, unc)
@@ -177,7 +232,7 @@ class PneumoInferenceEngine:
             }
             predictions.append(finding_dict)
 
-            if is_pos and cls_name != "No Finding":
+            if is_pos and cls_name not in ("No Finding", "No_Finding", "Normal"):
                 positive_findings.append((cls_name, prob, idx))
 
         # 6. Primary Finding Logic
@@ -188,13 +243,18 @@ class PneumoInferenceEngine:
         else:
             primary_finding = "No Finding"
 
-        # 7. Generate Grad-CAM / Grad-CAM++ for positive findings or top finding
+        # 7. Save original image
+        fn_orig_main = f"{case_id}_original.png"
+        orig_main_path = HEATMAPS_DIR / fn_orig_main
+        if not orig_main_path.exists():
+            pil_img.save(orig_main_path)
+        main_orig_url = f"/static/heatmaps/{fn_orig_main}"
+
+        # 8. Generate Grad-CAM / Grad-CAM++ for all target disease classes
         heatmaps = {}
         heatmap_files = {}
 
-        classes_to_cam = positive_findings if positive_findings else [(primary_finding, base_probs[self.target_classes.index(primary_finding)], self.target_classes.index(primary_finding))]
-
-        for cls_name, p_val, idx in classes_to_cam:
+        for idx, cls_name in enumerate(self.target_classes):
             try:
                 # Requires grad for backward pass
                 cam_2d = self.gradcam.generate_heatmap(
@@ -210,47 +270,44 @@ class PneumoInferenceEngine:
                 
                 if save_heatmaps:
                     # Only draw bounding box / contours if condition is positive and abnormal
-                    should_draw = is_cls_pos and (cls_name != "No Finding")
+                    should_draw = is_cls_pos and (cls_name not in ("No Finding", "No_Finding", "Normal"))
                     overlay_img = overlay_heatmap_on_image(
                         pil_img,
                         cam_2d,
-                        alpha=0.55 if should_draw else 0.25,
-                        threshold=0.38,
+                        alpha=0.55 if should_draw else (0.0 if cls_name in ("No Finding", "No_Finding", "Normal") else 0.25),
+                        threshold=0.36,
                         draw_contours=should_draw,
                         draw_box=should_draw
                     )
                     side_by_side = create_side_by_side_comparison(pil_img, overlay_img, finding_title=cls_name)
 
-                    fn_orig = f"{case_id}_original.png"
                     fn_overlay = f"{case_id}_{cls_name.lower().replace(' ', '_')}_overlay.png"
                     fn_side = f"{case_id}_{cls_name.lower().replace(' ', '_')}_side.png"
 
-                    orig_path = HEATMAPS_DIR / fn_orig
                     overlay_path = HEATMAPS_DIR / fn_overlay
                     side_path = HEATMAPS_DIR / fn_side
 
-                    if not orig_path.exists():
-                        pil_img.save(orig_path)
                     overlay_img.save(overlay_path)
                     side_by_side.save(side_path)
+
+                    loc_data = extract_heatmap_localization_data(
+                        cam_2d,
+                        image_shape=(pil_img.height, pil_img.width)
+                    )
 
                     heatmap_files[cls_name] = {
                         "overlay_url": f"/static/heatmaps/{fn_overlay}",
                         "side_url": f"/static/heatmaps/{fn_side}",
-                        "original_url": f"/static/heatmaps/{fn_orig}",
+                        "original_url": main_orig_url,
                         "overlay_path": str(overlay_path),
                         "side_path": str(side_path),
-                        "original_path": str(orig_path),
+                        "original_path": str(orig_main_path),
                         "localization": loc_data
                     }
             except Exception as cam_err:
                 print(f"Warning: GradCAM failed for {cls_name}: {cam_err}")
-
-        # Always save original image URL
-        fn_orig_main = f"{case_id}_original.png"
-        orig_main_path = HEATMAPS_DIR / fn_orig_main
-        if not orig_main_path.exists():
-            pil_img.save(orig_main_path)
+                import traceback
+                traceback.print_exc()
 
         return {
             "case_id": case_id,
@@ -264,5 +321,5 @@ class PneumoInferenceEngine:
             "heatmaps": heatmap_files,
             "raw_heatmaps": heatmaps,
             "original_image": pil_img,
-            "original_image_url": f"/static/heatmaps/{fn_orig_main}"
+            "original_image_url": main_orig_url
         }

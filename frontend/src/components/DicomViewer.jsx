@@ -25,18 +25,18 @@ export default function DicomViewer({
   const [showCrosshair, setShowCrosshair] = useState(false);
 
   const heatmaps = analysisResult?.heatmaps || {};
-  const activeFinding = selectedFinding || analysisResult?.primary_finding || Object.keys(heatmaps)[0];
+  const activeFinding = selectedFinding || analysisResult?.primary_finding || Object.keys(heatmaps)[0] || 'Pneumonia';
   const activeHeatmapData = heatmaps[activeFinding];
   const locData = activeHeatmapData?.localization;
 
-  // Resolve Image URL based on view mode
+  // Resolve Image URL based on view mode with safe fallbacks
   let displayUrl = null;
   if (viewMode === 'side') {
-    displayUrl = activeHeatmapData?.side_url;
+    displayUrl = activeHeatmapData?.side_url || activeHeatmapData?.overlay_url || analysisResult?.original_image_url;
   } else if (viewMode === 'original') {
     displayUrl = analysisResult?.original_image_url || activeHeatmapData?.original_url;
   } else {
-    displayUrl = activeHeatmapData?.overlay_url;
+    displayUrl = activeHeatmapData?.overlay_url || activeHeatmapData?.original_url || analysisResult?.original_image_url;
   }
 
   const applyPreset = (preset) => {
@@ -78,10 +78,10 @@ export default function DicomViewer({
         </div>
 
         {/* Finding Layer Selector */}
-        {Object.keys(heatmaps).length > 1 && (
+        {Object.keys(heatmaps).filter((k) => k !== 'No Finding').length > 1 && (
           <div className="toolbar-btn-group">
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Layer:</span>
-            {Object.keys(heatmaps).map((fName) => (
+            {Object.keys(heatmaps).filter((k) => k !== 'No Finding').map((fName) => (
               <button
                 key={fName}
                 className={`pacs-tool-btn ${activeFinding === fName ? 'active' : ''}`}
