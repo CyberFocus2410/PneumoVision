@@ -1,0 +1,16 @@
+{
+  "localhost": {
+    "contractAddress": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb",
+    "transactionHash": "0x8739912beb37b86e3fd7e968be034df7bddc4b4da20a8b381095c21fd82c7629",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "network": "localhost",
+    "chainId": 31337,
+    "deployedAt": "2026-09-12T19:52:04.770Z",
+    "features": [
+      "Patient Identity Registration (registerPatient)",
+      "Provider Authorization Lifecycle (authorizeProvider, revokeProvider)",
+      "Consent Management (grantAccess, revokeAccess, hasAccess)",
+      "Tamper-evident Care Timeline (addRecord, getRecords, getRecordCount)"
+    ]
+  }
+}
