@@ -1,544 +1,539 @@
 import React, { useState } from 'react';
-import {
-  ShieldAlert,
-  ShieldCheck,
-  AlertTriangle,
-  FileCheck2,
-  FileX2,
-  CheckCircle2,
-  XCircle,
-  Download,
-  RefreshCw,
-  ArrowLeft,
-  Lock,
-  Database,
-  Layers,
-  ChevronDown,
-  ChevronRight
-} from 'lucide-react';
-import { Card, StatusPill, MonoHash, Badge } from './common';
 
 export default function TamperAuditTab({ onNavigateSafe }) {
-  const [isTampered, setIsTampered] = useState(true);
-  const [isReverifying, setIsReverifying] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isRefetching, setIsRefetching] = useState(false);
+  const [refetchSuccess, setRefetchSuccess] = useState(false);
+  const [ticketFiled, setTicketFiled] = useState(false);
 
-  // Clinical record scenario data
-  const samplePatient = 'PX-884920';
-  const expectedHash = '0xa8f2b74041d5b12a8190c1f54a8b792e3d9943015f69a19c63bb49871a39f902';
-  const corruptedHash = '0x3c99f11200ba71e8992a0141f11cb792e3d9943015f69a19c63bb49871a00000';
-
-  const validPayload = {
-    record_id: 'REC-PNEUMO-09411',
-    patient_ref: 'PX-884920',
-    medication_prescribed: 'Amoxicillin-Clavulanate 875mg',
-    frequency: 'BID x 7 days',
-    icd_10_cm: 'J18.9',
-    ai_assisted_flag: true,
-    confidence_score: 0.784
-  };
-
-  const tamperedPayload = {
-    record_id: 'REC-PNEUMO-09411',
-    patient_ref: 'PX-884920',
-    medication_prescribed: 'Ciprofloxacin 500mg',
-    frequency: 'BID x 7 days',
-    icd_10_cm: 'J18.9',
-    ai_assisted_flag: true,
-    confidence_score: 0.784
-  };
-
-  const handleDownloadAudit = () => {
-    const auditReport = {
-      audit_event: 'DATA_INTEGRITY_VERIFICATION',
+  const handleDownloadJSON = () => {
+    const report = {
+      incident_id: "EHR-SEC-2023-8921-TAMPER",
+      status: "QUARANTINED",
+      block_number: 1849188,
+      contract: "PatientRecords.sol (MST Testnet)",
+      expected_hash: "0xa8f2b74041d5b12a8190c1f54a8b792e3d9943015f69a19c63bb49871a39f902",
+      retrieved_hash: "0x3c99f11200ba71e8992a0141f11cb792e3d9943015f69a19c63bb49871a00000",
       timestamp: new Date().toISOString(),
-      patient_pseudonym: samplePatient,
-      smart_contract: 'PatientRecords.sol (MST Testnet)',
-      expected_onchain_hash: expectedHash,
-      computed_offchain_hash: isTampered ? corruptedHash : expectedHash,
-      verification_status: isTampered ? 'HASH_MISMATCH_DETECTED' : 'CRYPTOGRAPHIC_MATCH_CONFIRMED',
-      incident_id: isTampered ? 'EHR-SEC-TAMPER-09411' : null,
-      discrepancy: isTampered ? {
-        field: 'medication_prescribed',
-        expected: validPayload.medication_prescribed,
-        observed: tamperedPayload.medication_prescribed,
-        warning: 'Unauthorized medication substitution detected'
-      } : null
+      clinician: "Dr. K. Arisawa, MD",
+      patient_ref: "0x8f4c...b29a",
+      discrepancy: {
+        field_altered: "medication_prescribed",
+        original: "Amoxicillin-Clavulanate 875mg",
+        corrupted: "Ciprofloxacin 500mg"
+      }
     };
-
-    const blob = new Blob([JSON.stringify(auditReport, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `tamper-audit-${samplePatient}.json`;
+    a.download = "tamper-incident-8921.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setDownloadSuccess(true);
-    setTimeout(() => setDownloadSuccess(false), 2500);
   };
 
-  const handleReverify = () => {
-    setIsReverifying(true);
+  const handleRefetch = () => {
+    setIsRefetching(true);
     setTimeout(() => {
-      setIsReverifying(false);
-    }, 1200);
+      setIsRefetching(false);
+      setRefetchSuccess(true);
+      setTimeout(() => setRefetchSuccess(false), 3000);
+    }, 1800);
+  };
+
+  const handleFileTicket = () => {
+    setTicketFiled(true);
   };
 
   return (
-    <div className="w-full bg-surface-base min-h-screen p-space-md lg:p-space-lg flex flex-col gap-space-lg font-sans">
-      {/* Top Interactive Simulation Toolbar for Reviewers */}
-      <div className="flex flex-wrap items-center justify-between gap-space-sm bg-surface-card p-space-sm px-space-md rounded-lg border border-border-grid shadow-sm">
-        <div className="flex items-center gap-space-sm">
-          <Badge variant="primary" size="md">INTEGRITY SIMULATOR</Badge>
-          <span className="text-body-sm text-text-secondary">
-            Toggle scenario to demonstrate live blockchain tamper-detection vs. verified state:
-          </span>
+    <div className="flex flex-col w-full font-sans">
+      <div className="px-space-md py-space-md flex flex-col gap-space-md">
+        {/* Top Alert Banner: Level 3 Clinical Emergency Containment */}
+        <div className="bg-alert-tamper-bg rounded-lg p-space-md flex flex-col md:flex-row items-start justify-between gap-space-md border border-alert-tamper-border">
+          <div className="flex items-start gap-space-md">
+            <div className="w-10 h-10 rounded-lg bg-alert-tamper text-on-primary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[24px]">gpp_maybe</span>
+            </div>
+            <div className="flex flex-col gap-space-xs">
+              <div className="flex items-center gap-space-sm flex-wrap">
+                <span className="font-headline-lg text-headline-lg text-alert-tamper tracking-tight">
+                  CRITICAL DATA INTEGRITY ALERT: HASH MISMATCH DETECTED
+                </span>
+                <span className="font-label-sm text-label-sm bg-alert-tamper text-on-primary px-2 py-0.5 rounded tracking-wide">
+                  QUARANTINE ENFORCED
+                </span>
+              </div>
+              <p className="font-body-md text-body-md text-text-primary max-w-4xl">
+                Record content retrieved from off-chain database storage has been altered, corrupted, or tampered with since canonical on-chain registration on{' '}
+                <span className="font-label-md text-label-md text-alert-tamper font-semibold">Block #1849188</span>.
+                Cryptographic hash provenance invalidated. Clinical authorization and diagnostic interpretation are strictly suspended.
+              </p>
+              <div className="flex items-center gap-space-md mt-1 text-text-secondary font-label-sm text-label-sm flex-wrap">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-alert-tamper">shield_locked</span>
+                  Incident ID: <strong className="text-text-primary font-mono">EHR-SEC-2023-8921-TAMPER</strong>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">nest_clock_farsight_analog</span>
+                  Triage Latency: <strong className="text-text-primary">0.082s to lockdown</strong>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">lock</span>
+                  Ephemeral Patient Session: <strong className="text-text-primary">QUARANTINED</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-row md:flex-col items-end gap-space-xs shrink-0 self-stretch md:self-auto justify-between md:justify-start">
+            <div className="bg-surface-card px-space-sm py-1 rounded shadow-sm flex items-center gap-2 text-status-revoked font-label-md text-label-md border border-alert-tamper-border">
+              <span className="w-2 h-2 rounded-full bg-alert-tamper animate-ping" />
+              <span>RECORD STATE: MUTATED</span>
+            </div>
+            <span className="font-label-sm text-label-sm text-text-muted font-mono">Protocol: MST Testnet / SHA-256</span>
+          </div>
         </div>
-        <div className="flex items-center gap-space-xs">
-          <button
-            type="button"
-            onClick={() => setIsTampered(true)}
-            className={`px-space-md py-1 rounded text-headline-sm text-xs font-semibold transition-colors ${
-              isTampered
-                ? 'bg-alert-tamper text-on-primary shadow-sm'
-                : 'bg-surface-nested text-text-secondary hover:bg-border-grid'
-            }`}
-          >
-            Simulate Tampered Record
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsTampered(false)}
-            className={`px-space-md py-1 rounded text-headline-sm text-xs font-semibold transition-colors ${
-              !isTampered
-                ? 'bg-status-verified text-on-primary shadow-sm'
-                : 'bg-surface-nested text-text-secondary hover:bg-border-grid'
-            }`}
-          >
-            Simulate Verified Match
-          </button>
+
+        {/* Comparative Hash Discrepancy Matrix */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-md">
+          {/* Left Column: Source of Truth (Immutable On-Chain) */}
+          <div className="bg-surface-card rounded-lg p-space-md flex flex-col justify-between shadow-sm border border-border-grid">
+            <div className="flex flex-col gap-space-md">
+              <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70">
+                <div className="flex items-center gap-space-xs">
+                  <span className="material-symbols-outlined text-[18px] text-status-verified">verified_user</span>
+                  <h2 className="font-headline-md text-headline-md text-text-primary">
+                    On-Chain Ledger State (Source of Truth)
+                  </h2>
+                </div>
+                <span className="font-label-sm text-label-sm bg-status-verified-bg text-status-verified px-2 py-0.5 rounded font-semibold border border-status-verified-border">
+                  IMMUTABLE ANCHOR
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-space-sm bg-surface-nested p-space-sm rounded border border-border-grid">
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Block Reference</span>
+                  <span className="font-code-hash text-code-hash text-text-primary font-semibold">#1849188 (Confirmed)</span>
+                  <span className="font-label-sm text-label-sm text-text-secondary">Nov 18, 2023 16:45:12 UTC</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Smart Contract</span>
+                  <span className="font-code-hash text-code-hash text-secondary font-semibold">PatientRecords.sol</span>
+                  <span className="font-code-hash text-code-hash text-text-secondary">0x5FbDB2315678...0aa3</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Issuing Clinician</span>
+                  <span className="font-body-sm text-body-sm text-text-primary font-medium">Dr. E. Vance, MD (Attending)</span>
+                  <span className="font-code-hash text-code-hash text-text-secondary">0x70997970C5...79C8</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Network Node</span>
+                  <div className="flex items-center gap-1 text-status-verified font-label-md text-label-md mt-0.5">
+                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                    <span>MST Testnet Verified</span>
+                  </div>
+                  <span className="font-label-sm text-label-sm text-text-muted">Chain ID: 4731</span>
+                </div>
+              </div>
+
+              {/* Expected Hash Display */}
+              <div className="flex flex-col gap-space-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-label-sm text-text-secondary uppercase tracking-wider font-semibold">
+                    Expected Content Hash (bytes32 canonical)
+                  </span>
+                  <button
+                    className="text-text-muted hover:text-text-primary font-label-sm text-label-sm flex items-center gap-0.5 cursor-pointer"
+                    onClick={() => navigator.clipboard.writeText('0xa8f2b74041d5b12a8190c1f54a8b792e3d9943015f69a19c63bb49871a39f902')}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">content_copy</span> Copy Raw
+                  </button>
+                </div>
+                <div className="bg-dicom-surface p-space-sm rounded font-code-hash text-code-hash text-status-verified break-all select-all leading-relaxed border border-dicom-border">
+                  0xa8f2b74041d5b12a8190c1f54a8b792e3d9943015f69a19c63bb49871a39f902
+                </div>
+              </div>
+
+              {/* Original Verified Payload Detail */}
+              <div className="flex flex-col gap-space-xs">
+                <span className="font-label-sm text-label-sm text-text-secondary uppercase tracking-wider font-semibold">
+                  Mined Record Payload (Reconstituted JSON Segment)
+                </span>
+                <div className="bg-surface-nested p-space-sm rounded text-text-primary font-code-hash text-code-hash overflow-x-auto border border-border-grid">
+                  <pre className="m-0 leading-snug">
+                    <code>{`{
+  "record_id": "REC-PNEUMO-09411",
+  "patient_ref": "0x8f4c3982d...b29a",`}
+                      <span className="bg-status-verified-bg text-status-verified px-1 font-semibold block">
+                        {`  "medication_prescribed": "Amoxicillin-Clavulanate 875mg",`}
+                      </span>
+{`  "frequency": "BID x 7 days",
+  "icd_10_cm": "J18.9",
+  "ai_assisted_flag": true,
+  "confidence_score": 0.941
+}`}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-space-md pt-space-sm border-t border-border-grid flex items-center justify-between text-text-muted font-label-sm text-label-sm">
+              <span>Ledger State: Synced</span>
+              <span className="text-status-verified font-medium">Cryptographic Anchor: Confirmed</span>
+            </div>
+          </div>
+
+          {/* Right Column: Off-Chain Retrieved (Corrupted/Tampered) */}
+          <div className="bg-surface-card rounded-lg p-space-md flex flex-col justify-between shadow-sm relative overflow-hidden border border-alert-tamper-border">
+            <div className="absolute top-0 right-0 left-0 h-1 bg-alert-tamper" />
+
+            <div className="flex flex-col gap-space-md">
+              <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70">
+                <div className="flex items-center gap-space-xs">
+                  <span className="material-symbols-outlined text-[18px] text-alert-tamper">fmd_bad</span>
+                  <h2 className="font-headline-md text-headline-md text-alert-tamper">
+                    Off-Chain Database State (Current Retrieval)
+                  </h2>
+                </div>
+                <span className="font-label-sm text-label-sm bg-alert-tamper-bg text-alert-tamper px-2 py-0.5 rounded font-semibold animate-pulse border border-alert-tamper-border">
+                  INTEGRITY BREACH
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-space-sm bg-alert-tamper-bg/40 p-space-sm rounded border border-alert-tamper-border/50">
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Retrieved Timestamp</span>
+                  <span className="font-code-hash text-code-hash text-text-primary font-semibold">Nov 19, 2023 11:02:14 UTC</span>
+                  <span className="font-label-sm text-label-sm text-alert-tamper">Delta: +18h 17m post-mining</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Storage Source</span>
+                  <span className="font-code-hash text-code-hash text-text-primary font-semibold">Clinical Records Storage</span>
+                  <span className="font-code-hash text-code-hash text-text-secondary">backend-db.internal</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Corrupted Payload Bytes</span>
+                  <span className="font-body-sm text-body-sm text-alert-tamper font-medium">8 octets modified at offset 0x4B</span>
+                  <span className="font-label-sm text-label-sm text-text-muted">Unauthenticated DB Write</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-label-sm text-text-muted uppercase">Hash Discrepancy Status</span>
+                  <div className="flex items-center gap-1 text-alert-tamper font-label-md text-label-md mt-0.5 font-bold">
+                    <span className="material-symbols-outlined text-[14px]">cancel</span>
+                    <span>SHA-256 DELTA DETECTED</span>
+                  </div>
+                  <span className="font-label-sm text-label-sm text-alert-tamper">Bits altered in segment 0-4, 30-31</span>
+                </div>
+              </div>
+
+              {/* Computed Corrupted Hash Display */}
+              <div className="flex flex-col gap-space-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-label-sm text-alert-tamper uppercase tracking-wider font-semibold">
+                    Computed SHA-256 Hash of Payload (Payload Digest)
+                  </span>
+                  <span className="font-label-sm text-label-sm text-alert-tamper font-medium">
+                    HASH MATCH TEST: 0% MATCH
+                  </span>
+                </div>
+                <div className="bg-dicom-surface p-space-sm rounded font-code-hash text-code-hash text-alert-tamper break-all select-all leading-relaxed relative border border-dicom-border">
+                  <span className="bg-alert-tamper/20 text-alert-tamper underline decoration-wavy">0x3c99f11200</span>
+                  ba71e8992a0141f11cb792e3d9943015f69a19c63bb49871a
+                  <span className="bg-alert-tamper/20 text-alert-tamper underline decoration-wavy">00000</span>
+                </div>
+              </div>
+
+              {/* Tampered Record Payload Detail with Diff */}
+              <div className="flex flex-col gap-space-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-label-sm text-alert-tamper uppercase tracking-wider font-semibold">
+                    Retrieved Payload (Unauthorized Clinical Modification)
+                  </span>
+                  <span className="font-label-sm text-label-sm bg-alert-tamper text-on-primary px-1 rounded">
+                    CRITICAL PHARMA DIFF
+                  </span>
+                </div>
+                <div className="bg-surface-nested p-space-sm rounded text-text-primary font-code-hash text-code-hash overflow-x-auto border border-border-grid">
+                  <pre className="m-0 leading-snug">
+                    <code>{`{
+  "record_id": "REC-PNEUMO-09411",
+  "patient_ref": "0x8f4c3982d...b29a",`}
+                      <span className="bg-alert-tamper text-on-primary font-bold px-1 rounded block">
+                        {`  "medication_prescribed": "Ciprofloxacin 500mg",`}
+                      </span>
+{`  "frequency": "BID x 7 days",
+  "icd_10_cm": "J18.9",
+  "ai_assisted_flag": true,
+  "confidence_score": 0.941
+}`}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-space-md pt-space-sm flex items-center justify-between text-text-muted font-label-sm text-label-sm bg-alert-tamper-bg/60 -mx-space-md -mb-space-md px-space-md py-space-xs border-t border-alert-tamper-border">
+              <span className="text-alert-tamper font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">warning</span> Tamper Mechanism: Out-of-band DB mutation
+              </span>
+              <span className="text-alert-tamper font-semibold">Ledger Invalidation: TRUE</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Main Alert Banner */}
-      {isTampered ? (
-        <Card variant="tamper" padding="lg" rounded="lg">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-space-md">
-            <div className="flex items-start gap-space-md">
-              <div className="w-10 h-10 rounded-lg bg-alert-tamper text-on-primary flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-6 h-6" />
-              </div>
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex items-center gap-space-sm flex-wrap">
-                  <h1 className="font-headline-lg text-headline-lg text-alert-tamper tracking-tight">
-                    CRITICAL DATA INTEGRITY ALERT: HASH MISMATCH DETECTED
-                  </h1>
-                  <StatusPill status="tamper" label="INTEGRITY BREACH" size="sm" pulse />
-                </div>
-                <p className="font-body-md text-body-md text-text-primary max-w-4xl leading-relaxed">
-                  Off-chain record payload retrieved from database storage does not match the immutable cryptographic anchor recorded on the blockchain ledger (Block #1849188). Content has been altered or corrupted post-registration. Clinical review is suspended until data provenance is restored.
-                </p>
-                <div className="flex items-center gap-space-md mt-1 text-text-secondary font-label-sm text-label-sm flex-wrap">
-                  <span className="flex items-center gap-1 font-mono">
-                    <span className="text-alert-tamper font-semibold">Incident ID:</span> EHR-SEC-TAMPER-09411
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>Patient:</span>
-                    <MonoHash hash={samplePatient} copyable={false} size="sm" />
-                  </span>
-                  <span className="flex items-center gap-1 text-status-revoked font-semibold">
-                    State: MUTATED OFF-CHAIN
-                  </span>
-                </div>
-              </div>
+        {/* Forensic Visual Byte Diff Visualizer */}
+        <div className="bg-surface-card rounded-lg p-space-md shadow-sm flex flex-col gap-space-sm border border-border-grid">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-space-xs">
+              <span className="material-symbols-outlined text-[16px] text-text-secondary">compare_arrows</span>
+              <h3 className="font-headline-sm text-headline-sm text-text-primary">Byte-Level Diff Analyzer</h3>
             </div>
-            <div className="shrink-0 flex flex-col items-end gap-space-xs self-stretch lg:self-auto">
-              <Badge variant="tamper" size="md">SHA-256 MISMATCH</Badge>
-              <span className="font-label-sm text-label-sm text-text-muted">Network: MST Testnet</span>
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <Card variant="verified" padding="lg" rounded="lg">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-space-md">
-            <div className="flex items-start gap-space-md">
-              <div className="w-10 h-10 rounded-lg bg-status-verified text-on-primary flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex items-center gap-space-sm flex-wrap">
-                  <h1 className="font-headline-lg text-headline-lg text-status-verified tracking-tight">
-                    CRYPTOGRAPHIC INTEGRITY CONFIRMED: 100% MATCH
-                  </h1>
-                  <StatusPill status="verified" label="BITWISE MATCH" size="sm" />
-                </div>
-                <p className="font-body-md text-body-md text-text-primary max-w-4xl leading-relaxed">
-                  Off-chain record content exactly matches the on-chain cryptographic anchor on the blockchain ledger (Block #1849188). Zero alterations or mutations detected.
-                </p>
-              </div>
-            </div>
-            <div className="shrink-0">
-              <Badge variant="verified" size="md">VERIFIED AUTHENTIC</Badge>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Comparative Hash Discrepancy Matrix */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-md">
-        {/* Left Column: On-Chain Ledger State */}
-        <Card variant="default" padding="lg" rounded="lg" className="flex flex-col justify-between">
-          <div className="flex flex-col gap-space-md">
-            <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70">
-              <div className="flex items-center gap-space-xs text-status-verified font-semibold">
-                <CheckCircle2 className="w-5 h-5" />
-                <h2 className="font-headline-md text-headline-md text-text-primary">
-                  On-Chain Ledger State (Source of Truth)
-                </h2>
-              </div>
-              <Badge variant="verified" size="sm">IMMUTABLE ANCHOR</Badge>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-sm bg-surface-nested p-space-sm rounded">
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Block Reference</span>
-                <span className="font-code-hash text-code-hash text-text-primary font-semibold">Block #1849188</span>
-                <span className="font-label-sm text-label-sm text-text-secondary">Nov 18, 2023 16:45 UTC</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Smart Contract</span>
-                <span className="font-code-hash text-code-hash text-secondary font-semibold">PatientRecords.sol</span>
-                <MonoHash hash="0x5FbDB2315678afecb367f032d93F642f64180aa3" truncate size="sm" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Attending Clinician</span>
-                <span className="font-body-sm text-body-sm text-text-primary font-medium">Dr. Vivan (MST Medical Officer)</span>
-                <MonoHash hash="0xb3C09303335393D511F9eE1C7Bf4f1154904142b" truncate size="sm" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Network Node</span>
-                <span className="font-code-hash text-code-hash text-text-primary font-semibold">MST Testnet</span>
-                <span className="font-label-sm text-label-sm text-status-verified font-medium">Status: Synced</span>
-              </div>
-            </div>
-
-            {/* Expected Hash Display */}
-            <div className="flex flex-col gap-space-xs">
-              <span className="font-label-sm text-label-sm text-text-secondary uppercase tracking-wider font-semibold">
-                Expected Content Hash (bytes32 canonical anchor)
-              </span>
-              <div className="bg-dicom-surface p-space-sm rounded">
-                <MonoHash hash={expectedHash} truncate={false} theme="verified" className="w-full justify-between" />
-              </div>
-            </div>
-
-            {/* Mined Record Payload Segment */}
-            <div className="flex flex-col gap-space-xs">
-              <span className="font-label-sm text-label-sm text-text-secondary uppercase tracking-wider font-semibold">
-                Original Payload Registered On-Chain
-              </span>
-              <pre className="bg-surface-nested p-space-sm rounded font-code-hash text-code-hash text-text-primary overflow-x-auto text-[11px] leading-relaxed select-all">
-                {JSON.stringify(validPayload, null, 2)}
-              </pre>
-            </div>
-          </div>
-          <div className="mt-space-md pt-space-sm border-t border-border-grid flex items-center justify-between text-text-muted font-label-sm text-label-sm">
-            <span>State Anchor: Confirmed</span>
-            <span className="text-status-verified font-medium">Hash bitwise verification: Ready</span>
-          </div>
-        </Card>
-
-        {/* Right Column: Off-Chain Retrieved Record */}
-        <Card
-          variant={isTampered ? 'tamper' : 'default'}
-          padding="lg"
-          rounded="lg"
-          className="flex flex-col justify-between relative overflow-hidden"
-        >
-          {isTampered && <div className="absolute top-0 right-0 left-0 h-1 bg-alert-tamper" />}
-
-          <div className="flex flex-col gap-space-md">
-            <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70">
-              <div className="flex items-center gap-space-xs">
-                {isTampered ? (
-                  <AlertTriangle className="w-5 h-5 text-alert-tamper" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5 text-status-verified" />
-                )}
-                <h2 className={`font-headline-md text-headline-md ${isTampered ? 'text-alert-tamper' : 'text-text-primary'}`}>
-                  Off-Chain Database State (Current Retrieval)
-                </h2>
-              </div>
-              <Badge variant={isTampered ? 'tamper' : 'verified'} size="sm">
-                {isTampered ? 'MODIFIED' : 'AUTHENTIC'}
-              </Badge>
-            </div>
-
-            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-space-sm p-space-sm rounded ${
-              isTampered ? 'bg-alert-tamper-bg/60' : 'bg-surface-nested'
-            }`}>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Retrieved Timestamp</span>
-                <span className="font-code-hash text-code-hash text-text-primary font-semibold">Just now</span>
-                <span className={`font-label-sm text-label-sm ${isTampered ? 'text-alert-tamper font-semibold' : 'text-status-verified'}`}>
-                  {isTampered ? 'Out-of-band edit detected' : 'Synchronized with chain'}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Database Storage</span>
-                <span className="font-code-hash text-code-hash text-text-primary font-semibold">Clinical Records DB</span>
-                <span className="font-label-sm text-label-sm text-text-secondary">Off-chain secure store</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Discrepancy Status</span>
-                <span className={`font-code-hash text-code-hash font-semibold ${isTampered ? 'text-alert-tamper' : 'text-status-verified'}`}>
-                  {isTampered ? 'SHA-256 HASH MISMATCH' : 'SHA-256 EXACT MATCH'}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-text-muted uppercase">Field Modification</span>
-                <span className={`font-label-sm text-label-sm font-semibold ${isTampered ? 'text-alert-tamper' : 'text-status-verified'}`}>
-                  {isTampered ? 'medication_prescribed substituted' : '0 fields modified'}
-                </span>
-              </div>
-            </div>
-
-            {/* Computed Hash Display */}
-            <div className="flex flex-col gap-space-xs">
-              <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${
-                isTampered ? 'text-alert-tamper' : 'text-text-secondary'
-              }`}>
-                Computed SHA-256 Digest of Retrieved Payload
-              </span>
-              <div className="bg-dicom-surface p-space-sm rounded">
-                <MonoHash
-                  hash={isTampered ? corruptedHash : expectedHash}
-                  truncate={false}
-                  theme={isTampered ? 'tamper' : 'verified'}
-                  className="w-full justify-between"
-                />
-              </div>
-            </div>
-
-            {/* Retrieved Payload Detail */}
-            <div className="flex flex-col gap-space-xs">
-              <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${
-                isTampered ? 'text-alert-tamper' : 'text-text-secondary'
-              }`}>
-                Retrieved Payload ({isTampered ? 'Altered Record' : 'Clean Record'})
-              </span>
-              <pre className={`p-space-sm rounded font-code-hash text-code-hash overflow-x-auto text-[11px] leading-relaxed select-all ${
-                isTampered ? 'bg-alert-tamper-bg text-alert-tamper border border-alert-tamper-border' : 'bg-surface-nested text-text-primary'
-              }`}>
-                {JSON.stringify(isTampered ? tamperedPayload : validPayload, null, 2)}
-              </pre>
-            </div>
-          </div>
-
-          <div className="mt-space-md pt-space-sm border-t border-border-grid flex items-center justify-between text-text-muted font-label-sm text-label-sm">
-            <span className={isTampered ? 'text-alert-tamper font-medium' : 'text-status-verified font-medium'}>
-              {isTampered ? 'Tamper Detected: Yes' : 'Tamper Detected: No'}
-            </span>
-            <span className="font-semibold">
-              {isTampered ? 'Status: QUARANTINED' : 'Status: READY FOR CLINIC'}
+            <span className="font-label-sm text-label-sm text-text-muted font-mono">
+              Target Byte Offset: [0x004A:0x006E] · 36 Bytes Substituted
             </span>
           </div>
-        </Card>
-      </div>
-
-      {/* Forensic Visual Field Diff Visualizer */}
-      {isTampered && (
-        <Card variant="default" padding="md" rounded="lg">
-          <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70 mb-space-sm">
-            <h3 className="font-headline-sm text-headline-sm text-text-primary">
-              Field-Level Clinical Diff Analyzer
-            </h3>
-            <Badge variant="tamper" size="sm">CRITICAL PHARMACEUTICAL MISMATCH</Badge>
-          </div>
-          <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs font-code-hash text-code-hash text-[11px]">
+          <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs font-code-hash text-code-hash text-[11px] border border-border-grid">
             <div className="flex flex-col sm:flex-row sm:items-center text-status-verified gap-2">
-              <span className="w-24 shrink-0 uppercase text-text-muted text-[10px] font-semibold">On-Chain Registered:</span>
-              <span className="px-2 py-1 bg-status-verified-bg border border-status-verified-border rounded font-semibold break-all">
-                medication_prescribed: "Amoxicillin-Clavulanate 875mg"
+              <span className="w-20 shrink-0 uppercase text-text-muted text-[10px] font-semibold">On-Chain:</span>
+              <span className="px-1 py-0.5 bg-status-verified-bg rounded font-semibold break-all border border-status-verified-border">
+                6d 65 64 69 63 61 74 69 6f 6e 5f 70 72 65 73 63 72 69 62 65 64 3a 20 41 6d 6f 78 69 63 69 6c 6c 69 6e 2d 43 6c 61 76 75 6c 61 6e 61 74 65 20 38 37 35 6d 67
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center text-alert-tamper gap-2">
-              <span className="w-24 shrink-0 uppercase text-text-muted text-[10px] font-semibold">Retrieved From DB:</span>
-              <span className="px-2 py-1 bg-alert-tamper-bg border border-alert-tamper-border rounded font-semibold break-all">
-                medication_prescribed: "Ciprofloxacin 500mg"
+              <span className="w-20 shrink-0 uppercase text-text-muted text-[10px] font-semibold">Retrieved:</span>
+              <span className="px-1 py-0.5 bg-alert-tamper-bg rounded font-semibold break-all border border-alert-tamper-border">
+                6d 65 64 69 63 61 74 69 6f 6e 5f 70 72 65 73 63 72 69 62 65 64 3a 20 43 69 70 72 6f 66 6c 6f 78 61 63 69 6e 20 35 30 30 6d 67 00 00 00 00 00 00 00 00 00 00
               </span>
             </div>
           </div>
-          <p className="font-body-sm text-body-sm text-alert-tamper font-medium mt-space-sm flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            Clinical Safety Warning: Medication changed from broad-spectrum penicillin to fluoroquinolone without clinician attestation.
-          </p>
-        </Card>
-      )}
-
-      {/* Step-by-Step Cryptographic Verification Pipeline */}
-      <Card variant="default" padding="lg" rounded="lg">
-        <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70 mb-space-md">
-          <div className="flex items-center gap-space-xs">
-            <Layers className="w-5 h-5 text-secondary" />
-            <h3 className="font-headline-md text-headline-md text-text-primary">
-              Step-by-Step Cryptographic Verification Pipeline
-            </h3>
+          <div className="flex items-center justify-between text-text-secondary font-body-sm text-body-sm">
+            <span className="flex items-center gap-1 text-alert-tamper font-medium">
+              <span className="material-symbols-outlined text-[14px]">report_problem</span>
+              Clinical Risk Warning: Prescription alteration from Broad-spectrum Penicillin to Fluoroquinolone without physician signature.
+            </span>
+            <span className="font-label-sm text-label-sm text-text-muted font-mono">Format: UTF-8 Binary</span>
           </div>
-          <span className="font-label-sm text-label-sm text-text-muted">MST Testnet Integrity Check</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-space-sm">
-          {/* Step 1 */}
-          <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid/50">
-            <div className="flex items-center justify-between">
-              <span className="font-label-sm text-label-sm text-text-muted">STEP 01</span>
-              <Badge variant="verified" size="sm">SUCCESS</Badge>
+        {/* Forensic Audit Log: Verification Pipeline Breakdown */}
+        <div className="bg-surface-card rounded-lg p-space-md shadow-sm flex flex-col gap-space-md border border-border-grid">
+          <div className="flex items-center justify-between pb-space-xs border-b border-border-grid/70">
+            <div className="flex items-center gap-space-xs">
+              <span className="material-symbols-outlined text-[18px] text-text-secondary">account_tree</span>
+              <h3 className="font-headline-md text-headline-md text-text-primary">
+                Step-by-Step Cryptographic Verification Pipeline
+              </h3>
             </div>
-            <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
-              Fetch On-Chain Hash
-            </span>
-            <p className="font-body-sm text-body-sm text-text-secondary">
-              Queried <code className="font-code-hash text-[11px]">PatientRecords.records()</code> on MST Testnet.
-            </p>
-            <span className="font-label-sm text-label-sm text-text-muted mt-auto">Block #1849188</span>
+            <span className="font-label-sm text-label-sm text-text-muted font-mono">MST Testnet Node Pipeline</span>
           </div>
 
-          {/* Step 2 */}
-          <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid/50">
-            <div className="flex items-center justify-between">
-              <span className="font-label-sm text-label-sm text-text-muted">STEP 02</span>
-              <Badge variant="verified" size="sm">SUCCESS</Badge>
-            </div>
-            <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
-              Retrieve Off-Chain Record
-            </span>
-            <p className="font-body-sm text-body-sm text-text-secondary">
-              Fetched patient record payload from backend clinical database.
-            </p>
-            <span className="font-label-sm text-label-sm text-text-muted mt-auto">Status: 200 OK</span>
-          </div>
-
-          {/* Step 3 */}
-          <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid/50">
-            <div className="flex items-center justify-between">
-              <span className="font-label-sm text-label-sm text-text-muted">STEP 03</span>
-              <Badge variant="verified" size="sm">SUCCESS</Badge>
-            </div>
-            <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
-              Compute Deterministic Hash
-            </span>
-            <p className="font-body-sm text-body-sm text-text-secondary">
-              Calculated <code className="font-code-hash text-[11px]">SHA-256(payload)</code>.
-            </p>
-            <span className="font-label-sm text-label-sm text-text-muted mt-auto">SHA-256 Standard</span>
-          </div>
-
-          {/* Step 4: Comparison */}
-          <div className={`p-space-sm rounded flex flex-col gap-space-xs border ${
-            isTampered ? 'bg-alert-tamper-bg border-alert-tamper-border' : 'bg-status-verified-bg border-status-verified-border'
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className={`font-label-sm text-label-sm font-semibold ${isTampered ? 'text-alert-tamper' : 'text-status-verified'}`}>
-                STEP 04
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-space-sm">
+            {/* Step 1 */}
+            <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-text-muted">STEP 01</span>
+                <span className="font-label-sm text-label-sm text-status-verified bg-status-verified-bg px-1 rounded flex items-center gap-0.5 border border-status-verified-border">
+                  <span className="material-symbols-outlined text-[11px]">done</span> SUCCESS
+                </span>
+              </div>
+              <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
+                Fetch Contract State
               </span>
-              <Badge variant={isTampered ? 'tamper' : 'verified'} size="sm">
-                {isTampered ? 'FAILED' : 'VERIFIED'}
-              </Badge>
+              <p className="font-body-sm text-body-sm text-text-secondary">
+                Invoked <code className="font-code-hash text-code-hash text-[11px]">PatientRecords.records()</code> on MST Testnet.
+              </p>
+              <span className="font-label-sm text-label-sm text-text-muted mt-auto">Block #1849188</span>
             </div>
-            <span className={`font-headline-sm text-headline-sm text-[13px] ${isTampered ? 'text-alert-tamper' : 'text-status-verified'}`}>
-              Compare Hashes
-            </span>
-            <p className="font-body-sm text-body-sm text-text-primary">
-              {isTampered
-                ? 'Expected hash != Computed hash. Mismatch detected!'
-                : 'Expected hash == Computed hash. 100% bitwise match.'}
-            </p>
-            <span className={`font-label-sm text-label-sm font-semibold mt-auto ${isTampered ? 'text-alert-tamper' : 'text-status-verified'}`}>
-              {isTampered ? 'HashMismatchTriggered' : 'LedgerIntegrityConfirmed'}
-            </span>
+
+            {/* Step 2 */}
+            <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-text-muted">STEP 02</span>
+                <span className="font-label-sm text-label-sm text-status-verified bg-status-verified-bg px-1 rounded flex items-center gap-0.5 border border-status-verified-border">
+                  <span className="material-symbols-outlined text-[11px]">done</span> SUCCESS
+                </span>
+              </div>
+              <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
+                Retrieve Record Payload
+              </span>
+              <p className="font-body-sm text-body-sm text-text-secondary">
+                Fetched record data from clinical off-chain database.
+              </p>
+              <span className="font-label-sm text-label-sm text-text-muted mt-auto">HTTP 200 (14.2 KB)</span>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-text-muted">STEP 03</span>
+                <span className="font-label-sm text-label-sm text-status-verified bg-status-verified-bg px-1 rounded flex items-center gap-0.5 border border-status-verified-border">
+                  <span className="material-symbols-outlined text-[11px]">done</span> SUCCESS
+                </span>
+              </div>
+              <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
+                Parse Canonical JSON
+              </span>
+              <p className="font-body-sm text-body-sm text-text-secondary">
+                Normalized and parsed JSON fields deterministically.
+              </p>
+              <span className="font-label-sm text-label-sm text-text-muted mt-auto">Payload Valid</span>
+            </div>
+
+            {/* Step 4 */}
+            <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-space-xs border border-border-grid">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-text-muted">STEP 04</span>
+                <span className="font-label-sm text-label-sm text-status-verified bg-status-verified-bg px-1 rounded flex items-center gap-0.5 border border-status-verified-border">
+                  <span className="material-symbols-outlined text-[11px]">done</span> SUCCESS
+                </span>
+              </div>
+              <span className="font-headline-sm text-headline-sm text-text-primary text-[13px]">
+                Compute SHA-256 Hash
+              </span>
+              <p className="font-body-sm text-body-sm text-text-secondary">
+                Executed <code className="font-code-hash text-code-hash text-[11px]">SHA256(payload)</code>. Yielded digest <code className="font-code-hash text-code-hash text-[11px]">0x3c99...0000</code>.
+              </p>
+              <span className="font-label-sm text-label-sm text-text-muted mt-auto">SHA-256 Calculated</span>
+            </div>
+
+            {/* Step 5: FAILED */}
+            <div className="bg-alert-tamper-bg rounded p-space-sm flex flex-col gap-space-xs border border-alert-tamper-border">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-alert-tamper font-semibold">STEP 05</span>
+                <span className="font-label-sm text-label-sm text-on-primary bg-alert-tamper px-1 rounded flex items-center gap-0.5 font-semibold">
+                  <span className="material-symbols-outlined text-[11px]">close</span> FAILED
+                </span>
+              </div>
+              <span className="font-headline-sm text-headline-sm text-alert-tamper text-[13px]">
+                Compare Cryptographic Hash
+              </span>
+              <p className="font-body-sm text-body-sm text-text-primary">
+                Expected <code className="font-code-hash text-code-hash text-[10px]">0xa8f2...f902</code> != Computed <code className="font-code-hash text-code-hash text-[10px]">0x3c99...0000</code>.
+              </p>
+              <span className="font-label-sm text-label-sm text-alert-tamper font-semibold mt-auto flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">dangerous</span> TamperEvidentMismatch
+              </span>
+            </div>
           </div>
         </div>
-      </Card>
 
-      {/* Safety Actions Bar */}
-      <Card variant="default" padding="md" rounded="lg" className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-space-md">
-        <div className="flex items-center gap-space-sm">
-          <Lock className="w-5 h-5 text-secondary shrink-0" />
-          <div className="flex flex-col">
-            <span className="font-headline-sm text-headline-sm text-text-primary">
-              Clinical Safety Policy Active
-            </span>
-            <span className="font-body-sm text-body-sm text-text-secondary">
-              Tampered records cannot be used for clinical orders without resolving the mismatch.
-            </span>
+        {/* Clinical Safety Protocol Actions Bar */}
+        <div className="bg-surface-card rounded-lg p-space-md shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-space-md border border-border-grid">
+          <div className="flex items-center gap-space-sm">
+            <div className="w-8 h-8 rounded-full bg-alert-tamper-bg flex items-center justify-center shrink-0 border border-alert-tamper-border">
+              <span className="material-symbols-outlined text-[20px] text-alert-tamper">gavel</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-headline-sm text-headline-sm text-text-primary">
+                Mandatory Clinical Safety Protocol Enforced
+              </span>
+              <span className="font-body-sm text-body-sm text-text-secondary">
+                Clinical orders and prescription dispensing are suspended until cryptographic match is re-established.
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-space-xs flex-wrap justify-end">
-          <button
-            type="button"
-            onClick={handleDownloadAudit}
-            className="h-8 px-space-md bg-surface-card hover:bg-surface-nested border border-border-grid text-text-primary font-headline-sm text-xs rounded flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{downloadSuccess ? 'Downloaded!' : 'Download Audit JSON'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleReverify}
-            disabled={isReverifying}
-            className="h-8 px-space-md bg-secondary text-on-primary hover:bg-secondary/90 font-headline-sm text-xs rounded flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isReverifying ? 'animate-spin' : ''}`} />
-            <span>{isReverifying ? 'Re-Verifying RPC...' : 'Re-Verify On-Chain'}</span>
-          </button>
-
-          {onNavigateSafe && (
+          {/* Action Button Group */}
+          <div className="flex items-center gap-space-xs flex-wrap justify-end">
             <button
+              className="h-8 px-space-md bg-surface-card text-text-primary hover:bg-surface-nested font-body-md text-body-md rounded flex items-center gap-1.5 transition-colors border border-border-grid cursor-pointer shadow-sm"
+              onClick={handleDownloadJSON}
               type="button"
-              onClick={onNavigateSafe}
-              className="h-8 px-space-md bg-primary text-on-primary hover:bg-primary-container font-headline-sm text-xs rounded flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Return to Workstation</span>
+              <span className="material-symbols-outlined text-[16px]">file_download</span>
+              <span>Download Audit Report (.json)</span>
             </button>
-          )}
-        </div>
-      </Card>
 
-      {/* Collapsible Inspection Details */}
-      <div className="bg-surface-nested rounded-lg p-space-sm border border-border-grid">
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full text-left flex items-center justify-between font-label-sm text-label-sm text-text-secondary select-none"
-        >
-          <div className="flex items-center gap-1 font-semibold uppercase tracking-wider">
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            <span>View Raw Cryptographic Verification Receipts</span>
+            <button
+              className="h-8 px-space-md bg-surface-card text-secondary hover:bg-secondary-fixed/20 font-body-md text-body-md rounded flex items-center gap-1.5 transition-colors border border-border-grid cursor-pointer shadow-sm"
+              onClick={handleRefetch}
+              disabled={isRefetching}
+              type="button"
+            >
+              <span className={`material-symbols-outlined text-[16px] ${isRefetching ? 'animate-spin' : ''}`}>
+                {refetchSuccess ? 'cloud_done' : 'cached'}
+              </span>
+              <span>
+                {isRefetching
+                  ? 'Re-syncing with Ledger...'
+                  : refetchSuccess
+                  ? 'Backup Verified Valid (#1849188)'
+                  : 'Re-fetch from Verified Node'}
+              </span>
+            </button>
+
+            <button
+              className={`h-8 px-space-md text-on-primary font-body-md text-body-md rounded flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer ${
+                ticketFiled ? 'bg-status-verified' : 'bg-alert-tamper hover:bg-status-revoked'
+              }`}
+              onClick={handleFileTicket}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {ticketFiled ? 'check' : 'notification_important'}
+              </span>
+              <span>{ticketFiled ? 'Ticket #SEC-8921 Dispatched' : 'File Incident Ticket #SEC-8921'}</span>
+            </button>
+
+            <button
+              className="h-8 px-space-md bg-primary text-on-primary hover:bg-primary-container font-body-md text-body-md rounded flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              onClick={() => onNavigateSafe && onNavigateSafe()}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              <span>Acknowledge &amp; Exit to Safe View</span>
+            </button>
           </div>
-          <span className="text-text-muted font-mono">Contract: PatientRecords.sol · MST Testnet</span>
-        </button>
+        </div>
 
-        {isExpanded && (
-          <pre className="mt-space-sm p-space-md bg-dicom-surface rounded font-code-hash text-code-hash text-[11px] text-dicom-text-secondary overflow-x-auto select-all">
-            {JSON.stringify({
-              network: "MST Testnet",
-              chainId: "0x127b (4731)",
-              contractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-              caller: "0xb3C09303335393D511F9eE1C7Bf4f1154904142b",
-              patientPseudonym: samplePatient,
-              expectedHashBytes32: expectedHash,
-              computedHashBytes32: isTampered ? corruptedHash : expectedHash,
-              status: isTampered ? "TAMPER_EVIDENT_MISMATCH" : "VERIFIED_VALID"
-            }, null, 2)}
-          </pre>
-        )}
+        {/* Collapsible Raw Forensic Audit Log Drawer / Inspection JSON */}
+        <div className="bg-surface-nested rounded-lg p-space-sm border border-border-grid">
+          <details className="group">
+            <summary className="cursor-pointer list-none flex items-center justify-between font-label-sm text-label-sm text-text-secondary select-none">
+              <div className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] group-open:rotate-90 transition-transform">
+                  chevron_right
+                </span>
+                <span className="font-semibold uppercase tracking-wider">
+                  Expand Complete Blockchain Attestation &amp; MST RPC Receipts
+                </span>
+              </div>
+              <span className="text-text-muted font-mono">Transaction: 0x7b2f4c919d...4490 (MST Testnet)</span>
+            </summary>
+            <div className="mt-space-sm pt-space-sm bg-dicom-surface p-space-md rounded font-code-hash text-code-hash text-[11px] text-dicom-text-secondary overflow-x-auto border border-dicom-border">
+              <pre className="m-0 leading-relaxed">
+                <code className="text-dicom-text-primary">{`{
+  "audit_version": "1.0.0",
+  "verification_status": "INTEGRITY_COMPROMISED",
+  "failure_code": "ERR_HASH_MISMATCH",
+  "smart_contract_call": {
+    "network_id": 4731,
+    "network_name": "MST Testnet Node #04",
+    "contract_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "caller_identity": "0xb3C09303335393D511F9eE1C7Bf4f1154904142b",
+    "tx_hash": "0x7b2f4c919d380e21a8112c3f87629b3014c2b9a76d1e438f9024cba449000000",
+    "block_number": 1849188,
+    "block_timestamp": 1700325912
+  },
+  "cryptographic_proof": {
+    "expected_hash_bytes32": "0xa8f2b74041d5b12a8190c1f54a8b792e3d9943015f69a19c63bb49871a39f902",
+    "computed_hash_bytes32": "0x3c99f11200ba71e8992a0141f11cb792e3d9943015f69a19c63bb49871a00000",
+    "hash_delta_bytes": [0, 1, 2, 3, 4, 30, 31],
+    "diff_classification": "CRITICAL_PHARMACOLOGICAL_MUTATION"
+  },
+  "triage_actions_taken": [
+    "CLINICAL_WORKFLOW_LOCKED",
+    "PATIENT_EPHEMERAL_SESSION_QUARANTINED",
+    "INCIDENT_DISPATCH_TRIGGERED"
+  ]
+}`}</code>
+              </pre>
+            </div>
+          </details>
+        </div>
       </div>
     </div>
   );
