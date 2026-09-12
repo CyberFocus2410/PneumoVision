@@ -1,10 +1,10 @@
 """
-Comprehensive Model Trainer for PneumoVision
-Handles multi-label optimization, Macro-AUROC tracking, Early Stopping,
-Temperature Calibration, and Checkpoint Packaging.
+Comprehensive Model Trainer for PneumoVision.
+Handles single-class binary & multi-label optimization, Macro-AUROC tracking, Early Stopping,
+Periodic & Best Checkpointing, Temperature Calibration, and Resume support.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from pathlib import Path
 import json
 import time
@@ -21,6 +21,7 @@ from src.training.losses import WeightedBCEWithLogitsLoss, MultiLabelFocalLoss
 from src.training.threshold_tuner import optimize_decision_thresholds
 from src.config import TARGET_CLASSES, TRAIN_CONFIG, CHECKPOINTS_DIR
 
+
 class PneumoTrainer:
     def __init__(
         self,
@@ -33,6 +34,7 @@ class PneumoTrainer:
         focal_gamma: float = TRAIN_CONFIG["focal_gamma"],
         use_focal_loss: bool = True,
         pos_weight: Optional[torch.Tensor] = None,
+        checkpoint_dir: Optional[Union[str, Path]] = None,
         device: Optional[torch.device] = None
     ):
         self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
@@ -40,6 +42,8 @@ class PneumoTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.target_classes = target_classes
+        self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else CHECKPOINTS_DIR
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
         # Loss function selection
         if use_focal_loss:
@@ -58,7 +62,7 @@ class PneumoTrainer:
             "train_loss": [], "val_loss": [], "val_macro_auroc": [], "val_macro_auprc": []
         }
         self.best_macro_auroc = 0.0
-        self.best_checkpoint_path = CHECKPOINTS_DIR / "best_model.pt"
+        self.best_checkpoint_path = self.checkpoint_dir / "best_model.pt"
 
     def train_epoch(self) -> float:
         self.model.train()
@@ -101,9 +105,9 @@ class PneumoTrainer:
                 all_probs.append(probs.cpu().numpy())
                 all_targets.append(targets.cpu().numpy())
 
-        val_loss = running_loss / max(1, len(loader))
-        probs_array = np.vstack(all_probs)
-        targets_array = np.vstack(all_targets)
+        val_loss = running_loss / max(1, len(loader)) if len(loader) > 0 else 0.0
+        probs_array = np.vstack(all_probs) if len(all_probs) > 0 else np.empty((0, len(self.target_classes)))
+        targets_array = np.vstack(all_targets) if len(all_targets) > 0 else np.empty((0, len(self.target_classes)))
 
         # Compute per-class AUROC and AUPRC
         metrics = {}
@@ -111,7 +115,6 @@ class PneumoTrainer:
         auprc_list = []
 
         for i, cls_name in enumerate(self.target_classes):
-            # Safe AUROC computation even if single class in batch
             try:
                 if len(np.unique(targets_array[:, i])) > 1:
                     auroc = float(roc_auc_score(targets_array[:, i], probs_array[:, i]))
@@ -128,16 +131,47 @@ class PneumoTrainer:
             auroc_list.append(auroc)
             auprc_list.append(auprc)
 
-        metrics["macro_auroc"] = round(float(np.mean(auroc_list)), 4)
-        metrics["macro_auprc"] = round(float(np.mean(auprc_list)), 4)
+        metrics["macro_auroc"] = round(float(np.mean(auroc_list)), 4) if auroc_list else 0.5
+        metrics["macro_auprc"] = round(float(np.mean(auprc_list)), 4) if auprc_list else 0.0
 
         return val_loss, probs_array, targets_array, metrics
 
-    def fit(self, epochs: int = TRAIN_CONFIG["epochs"], patience: int = TRAIN_CONFIG["patience"]):
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs, eta_min=1e-6)
+    def load_resume_checkpoint(self, resume_path: Union[str, Path]) -> int:
+        """Loads model, optimizer, metrics and history from a previous checkpoint."""
+        path = Path(resume_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Resume checkpoint not found: {path}")
+
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        
+        if "optimizer_state_dict" in checkpoint and checkpoint["optimizer_state_dict"]:
+            try:
+                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            except Exception as e:
+                print(f"[WARNING] Could not restore optimizer state: {e}")
+
+        self.best_macro_auroc = checkpoint.get("best_macro_auroc", checkpoint.get("macro_auroc", 0.0))
+        self.history = checkpoint.get("history", self.history)
+        start_epoch = checkpoint.get("epoch", 0) + 1
+        print(f"[RESUME] Checkpoint loaded from {path}. Resuming at epoch {start_epoch} (Best AUROC: {self.best_macro_auroc:.4f})")
+        return start_epoch
+
+    def fit(
+        self,
+        epochs: int = TRAIN_CONFIG["epochs"],
+        patience: int = TRAIN_CONFIG["patience"],
+        save_freq: int = 1,
+        resume_from: Optional[Union[str, Path]] = None,
+    ):
+        start_epoch = 1
+        if resume_from:
+            start_epoch = self.load_resume_checkpoint(resume_from)
+
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=max(1, epochs), eta_min=1e-6)
         no_improve_epochs = 0
 
-        for epoch in range(1, epochs + 1):
+        for epoch in range(start_epoch, epochs + 1):
             t0 = time.time()
             train_loss = self.train_epoch()
             val_loss, val_probs, val_targets, metrics = self.evaluate(self.val_loader)
@@ -150,72 +184,106 @@ class PneumoTrainer:
             self.history["val_macro_auprc"].append(metrics["macro_auprc"])
 
             elapsed = time.time() - t0
-            print(f"Epoch [{epoch:02d}/{epochs:02d}] ({elapsed:.1f}s) | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Macro AUROC: {macro_auroc:.4f}")
+            print(f"Epoch [{epoch:02d}/{epochs:02d}] ({elapsed:.1f}s) | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | AUROC: {macro_auroc:.4f}")
 
             # Checkpoint on best validation macro-AUROC
-            if macro_auroc > self.best_macro_auroc:
+            is_best = macro_auroc > self.best_macro_auroc
+            if is_best:
                 self.best_macro_auroc = macro_auroc
                 no_improve_epochs = 0
-                self.save_checkpoint(metrics, val_probs, val_targets)
+                self.save_checkpoint(metrics, val_probs, val_targets, epoch=epoch, is_best=True)
             else:
                 no_improve_epochs += 1
-                if no_improve_epochs >= patience:
-                    print(f"Early stopping triggered at epoch {epoch} (no improvement for {patience} epochs).")
-                    break
 
-        # Run Post-Training Calibration and Threshold Sweep
-        print("\n=== Post-Training Temperature Scaling & Calibration ===")
-        calibrated_model = ModelWithTemperature(self.model)
-        learned_temp = calibrated_model.fit_temperature(self.val_loader, device=self.device)
-        print(f"Learned Temperature Scalar: T = {learned_temp:.4f}")
+            # Periodic checkpointing
+            if save_freq > 0 and (epoch % save_freq == 0 or epoch == epochs):
+                self.save_checkpoint(metrics, val_probs, val_targets, epoch=epoch, is_best=False, is_periodic=True)
 
-        # Re-evaluate with calibrated model
-        _, cal_probs, cal_targets, cal_metrics = self.evaluate(self.val_loader)
-        ece_results = evaluate_multilabel_calibration(cal_probs, cal_targets, self.target_classes)
-        print(f"Post-calibration Macro ECE: {ece_results['macro_ece']:.4f}")
+            if no_improve_epochs >= patience:
+                print(f"Early stopping triggered at epoch {epoch} (no improvement for {patience} epochs).")
+                break
 
-        # Optimize Thresholds
-        tuned_thresholds = optimize_decision_thresholds(cal_probs, cal_targets, self.target_classes)
-        print("Tuned Decision Thresholds:", tuned_thresholds)
+        # Run Post-Training Calibration and Threshold Sweep if validation samples exist
+        if len(self.val_loader) > 0:
+            print("\n=== Post-Training Temperature Scaling & Calibration ===")
+            calibrated_model = ModelWithTemperature(self.model)
+            try:
+                learned_temp = calibrated_model.fit_temperature(self.val_loader, device=self.device)
+                print(f"Learned Temperature Scalar: T = {learned_temp:.4f}")
+            except Exception as e:
+                print(f"[WARNING] Calibration fitting skipped: {e}")
+                learned_temp = 1.0
 
-        # Finalize and update checkpoint with calibration & thresholds
-        self.save_checkpoint(
-            metrics=cal_metrics,
-            val_probs=cal_probs,
-            val_targets=cal_targets,
-            temperature=learned_temp,
-            tuned_thresholds=tuned_thresholds,
-            ece_results=ece_results
-        )
+            # Re-evaluate with calibrated model
+            _, cal_probs, cal_targets, cal_metrics = self.evaluate(self.val_loader)
+            ece_results = evaluate_multilabel_calibration(cal_probs, cal_targets, self.target_classes)
+            print(f"Post-calibration Macro ECE: {ece_results['macro_ece']:.4f}")
+
+            # Optimize Thresholds
+            tuned_thresholds = optimize_decision_thresholds(cal_probs, cal_targets, self.target_classes)
+            print("Tuned Decision Thresholds:", tuned_thresholds)
+
+            # Finalize best model checkpoint with calibration & thresholds
+            self.save_checkpoint(
+                metrics=cal_metrics,
+                val_probs=cal_probs,
+                val_targets=cal_targets,
+                epoch=epochs,
+                temperature=learned_temp,
+                tuned_thresholds=tuned_thresholds,
+                ece_results=ece_results,
+                is_best=True
+            )
 
     def save_checkpoint(
         self,
         metrics: Dict[str, float],
         val_probs: np.ndarray,
         val_targets: np.ndarray,
+        epoch: int = 0,
         temperature: float = 1.0,
         tuned_thresholds: Optional[Dict] = None,
-        ece_results: Optional[Dict] = None
+        ece_results: Optional[Dict] = None,
+        is_best: bool = False,
+        is_periodic: bool = False,
     ):
         checkpoint = {
+            "epoch": epoch,
             "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
             "target_classes": self.target_classes,
             "metrics": metrics,
             "temperature": temperature,
             "thresholds": tuned_thresholds or {},
             "ece_results": ece_results or {},
-            "macro_auroc": metrics.get("macro_auroc", 0.0)
+            "macro_auroc": metrics.get("macro_auroc", 0.0),
+            "best_macro_auroc": self.best_macro_auroc,
+            "history": self.history
         }
-        torch.save(checkpoint, self.best_checkpoint_path)
-        
-        # Save JSON metadata for lightweight API access
-        meta_path = CHECKPOINTS_DIR / "model_metadata.json"
-        with open(meta_path, "w") as f:
-            json.dump({
-                "model_name": "PneumoDenseNet121",
-                "target_classes": self.target_classes,
-                "metrics": metrics,
-                "temperature": temperature,
-                "thresholds": tuned_thresholds or {},
-                "ece_results": ece_results or {}
-            }, f, indent=2)
+
+        # Save latest checkpoint
+        latest_path = self.checkpoint_dir / "latest_checkpoint.pt"
+        torch.save(checkpoint, latest_path)
+
+        # Save periodic checkpoint
+        if is_periodic:
+            periodic_path = self.checkpoint_dir / f"checkpoint_epoch_{epoch:02d}.pt"
+            torch.save(checkpoint, periodic_path)
+
+        # Save best model checkpoint
+        if is_best:
+            torch.save(checkpoint, self.best_checkpoint_path)
+
+            # Save JSON metadata for lightweight API access
+            meta_path = self.checkpoint_dir / "model_metadata.json"
+            with open(meta_path, "w") as f:
+                json.dump({
+                    "model_name": "PneumoDenseNet121",
+                    "target_classes": self.target_classes,
+                    "metrics": metrics,
+                    "temperature": temperature,
+                    "thresholds": tuned_thresholds or {},
+                    "ece_results": ece_results or {},
+                    "best_macro_auroc": self.best_macro_auroc,
+                    "epoch": epoch
+                }, f, indent=2)
