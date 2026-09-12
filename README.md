@@ -14,27 +14,28 @@
 
 ## 🌟 Key Features
 
-1. **Multi-Label Pathology Screening (5 Target Findings)**:
-   - Identifies co-occurring pulmonary abnormalities: **Pneumonia, Cardiomegaly, Pleural Effusion, Atelectasis, No Finding (Normal)**.
-   - Built on **DenseNet-121** with custom classification heads and **Multi-Label Focal Loss** ($\gamma = 2.0$) to counter severe medical class imbalance.
+1. **Binary Pneumonia Abnormality Screener**:
+   - Classifies chest radiographs into **Pneumonia (1)** vs **Normal / No Finding (0)**.
+   - Built on **DenseNet-121** (ImageNet pre-trained) with custom classification heads and **Focal Loss** ($\gamma = 2.0$) to counter severe class imbalance.
 
 2. **Calibrated Probabilities & Uncertainty**:
-   - Post-training **Temperature Scaling** ($T = 1.184$) ensuring predicted percentages match empirical likelihood (low ECE < 0.035).
-   - Test-Time Augmentation (TTA) and Monte Carlo Dropout for patient-specific uncertainty bands ($\pm \text{std}$).
+   - Post-training **Temperature Scaling** ($T = 1.0000$) ensuring predicted confidence faithfully aligns with empirical likelihood (**ECE = 0.0342**).
+   - Test-Time Augmentation (TTA) and Monte Carlo Dropout for patient-specific uncertainty estimation ($\pm \text{std}$).
 
 3. **High-Resolution Explainability (Grad-CAM & Grad-CAM++)**:
-   - Generates pixel-level heatmaps pinpointing exactly where the network detected pathological features.
-   - Interactive blending, side-by-side view, and opacity adjustment sliders in the workstation viewer.
+   - Generates pixel-level heatmaps pinpointing pulmonary consolidations and airspace opacities.
+   - Interactive blending, side-by-side view, and opacity adjustment in the radiologist workstation viewer.
 
-4. **Longitudinal Study Progression Analysis**:
+4. **Blockchain-Backed Consent & Care Timeline**:
+   - Decentralized consent management via **`PatientRecords.sol`** on a local Hardhat network.
+   - Tracks full care progression: **Diagnosis → Treatment → Medication → Outcome**, with cryptographic hash verification and tamper detection. (See [BLOCKCHAIN.md](file:///c:/Users/Vivan/OneDrive/Documents/PROJECTS/PneumoVision/BLOCKCHAIN.md)).
+
+5. **Longitudinal Study Progression Analysis**:
    - Compare prior baseline vs follow-up radiographs to monitor disease trajectory (Marked Progression, Improvement, Resolution, Stable).
 
-5. **Hospital-Grade Structured Reporting & PDF Export**:
-   - Compiles radiology-lexicon structured findings (Technique, Findings by compartment, Impression).
-   - Exports signed, formatted PDF reports via **ReportLab** with embedded Grad-CAM overlays and mandatory disclaimers.
-
-6. **Human-in-the-Loop Clinician Feedback & Audit Trail**:
-   - Clinician agreement/disagreement logging for active learning and model governance.
+6. **Hospital-Grade Structured Reporting & PDF Export**:
+   - Compiles radiology-lexicon structured findings (Technique, AI Assessment, Recommendations).
+   - Exports formatted PDF reports via **ReportLab** with embedded Grad-CAM overlays and non-diagnostic disclaimers.
 
 ---
 
@@ -44,28 +45,33 @@
 PneumoVision/
 ├── app.py                      # Root launcher
 ├── requirements.txt            # Python dependencies
-├── evaluation_report.md        # Detailed AUROC, ECE, and calibration metrics
+├── evaluation_report.md        # Detailed AUROC, ECE, and calibration report
+├── BLOCKCHAIN.md               # Smart contract architecture & prototype disclaimers
 ├── data/
 │   ├── raw_cohort/             # Patient cohort data
 │   └── samples/                # Curated benchmark demonstration studies
 ├── src/
-│   ├── config.py               # Hyperparameters, paths & threshold configs
+│   ├── config.py               # Hyperparameters, paths & central label configs
 │   ├── preprocessing/          # DICOM parser, CLAHE, quality filters, label taxonomy
-│   ├── models/                 # DenseNet121, EfficientNet, Temperature Scaling
-│   ├── training/               # Stratified splitting, Focal loss, threshold tuner, trainer
+│   ├── models/                 # DenseNet121, Temperature Scaling, Focal Loss
+│   ├── training/               # Stratified patient splitting, threshold tuner, trainer
 │   ├── explainability/         # Grad-CAM, Grad-CAM++, heatmap overlays, IoU checker
-│   ├── inference/              # End-to-end inference orchestrator & longitudinal comparator
-│   └── reporting/              # Structured clinical reporting & ReportLab PDF engine
+│   ├── inference/              # Real checkpoint inference & longitudinal comparator
+│   └── reporting/              # Hedged clinical reporting & ReportLab PDF engine
 ├── backend/
 │   ├── main.py                 # FastAPI application server
-│   ├── routes/                 # REST API endpoints (/analyze, /report, /compare, /feedback, /health)
+│   ├── blockchain/             # Web3 client & off-chain tamper-evident store
+│   ├── routes/                 # REST API endpoints (/analyze, /consent, /records, /report)
 │   └── static/                 # Served heatmaps and generated PDF reports
+├── blockchain/
+│   ├── contracts/              # PatientRecords.sol smart contract
+│   └── hardhat.config.js       # Local Hardhat environment configuration
 ├── frontend/
-│   ├── src/                    # Bespoke React clinical workstation UI
+│   ├── src/                    # React clinical workstation (Single, Longitudinal, Access, History)
 │   └── index.html
 ├── models/
-│   └── checkpoints/            # Model weights and calibration metadata
-└── tests/                      # Pytest unit and integration test suite
+│   └── checkpoints/            # Trained checkpoint & model metadata
+└── tests/                      # Pytest unit, model, API, and blockchain test suite
 ```
 
 ---
@@ -80,9 +86,10 @@ cd PneumoVision
 pip install -r requirements.txt
 ```
 
-### 2. Train and Calibrate Model (Offline Pipeline)
+### 2. Run Local Hardhat Node & Deploy Contract (Optional for Blockchain)
 ```bash
-python scripts/train_model.py
+npx hardhat node
+npx hardhat run blockchain/scripts/deploy.js --network localhost
 ```
 
 ### 3. Launch Application
@@ -102,19 +109,37 @@ pytest tests/ -v
 
 ---
 
-## 📊 Evaluation & Validation Summary
+## 📊 Empirical Evaluation & Validation (Held-Out Test Set)
 
-| Target Class | AUROC | PR-AUC | Tuned Cutoff | Post-Calibration ECE |
-|---|---|---|---|---|
-| **Pneumonia** | 0.884 | 0.842 | 0.38 | 0.034 |
-| **Cardiomegaly** | 0.912 | 0.875 | 0.42 | 0.031 |
-| **Pleural Effusion** | 0.895 | 0.858 | 0.35 | 0.029 |
-| **Atelectasis** | 0.865 | 0.812 | 0.36 | 0.039 |
-| **No Finding** | 0.902 | 0.881 | 0.50 | 0.026 |
+Quantitative validation of the **Binary Pneumonia Screener** checkpoint evaluated on the **held-out test split of 624 chest radiographs** (390 Pneumonia, 234 Normal) from the Kaggle Chest X-Ray cohort:
 
-*Tested on held-out patient-level partitions with 0% patient leakage.*
+| Metric | Result | Target Benchmark | Clinical Significance |
+| :--- | :--- | :--- | :--- |
+| **AUROC** | **0.9707** | $\ge 0.85$ | High discriminative accuracy across all classification thresholds |
+| **PR-AUC (AUPRC)** | **0.9765** | $\ge 0.85$ | Robust precision sustained across high-recall operating regimes |
+| **Sensitivity (Recall)** | **99.74%** | $\ge 90.0\%$ | 389/390 pneumonia cases detected (1 missed case) — essential for screening |
+| **Specificity** | **47.44%** | $\ge 45.0\%$ | Flags normal studies to prioritize radiologist workflow |
+| **Precision (PPV)** | **75.98%** | — | Positive predictive value within the test prevalence |
+| **F1-Score** | **0.8625** | $\ge 0.80$ | Harmonic balance of precision and high sensitivity |
+| **Overall Accuracy** | **80.13%** | $\ge 75.0\%$ | Overall exact classification accuracy on test partition |
+| **Calibration (ECE)** | **0.0342** | $\le 0.08$ | Expected Calibration Error post Temperature Scaling ($T=1.0000$) |
+
+---
+
+## ⚠️ Source Data Limitations & Future Roadmap
+
+> [!IMPORTANT]
+> **Research & Educational Screening Aid — Not a Medical Diagnostic Device**
+> 1. **Single-Institution Pediatric Source Data**:
+>    - The current model was trained on the public Kaggle Chest X-Ray Pneumonia cohort, acquired exclusively at Guangzhou Women and Children's Medical Center.
+>    - The cohort is **pediatric-only (ages 1–5)**. Due to physiological and anatomical differences between pediatric and adult rib cage and pulmonary structures, this checkpoint has **limited generalization** to adult or cross-institutional patient populations.
+> 2. **Acquisition-Based Shortcut Learning Risks**:
+>    - Differences in clinical imaging pathways (AP vs PA projection, patient positioning, contrast differences) in the source dataset represent potential shortcut learning risks.
+> 3. **Planned Next Step**:
+>    - A multi-disease screening model trained across **NIH ChestX-ray14 (112,120 adult radiographs)** and **TBX11K (Tuberculosis detection)** is planned as the next milestone to achieve multi-disease coverage and cross-institution adult generalization.
 
 ---
 
 ## 📄 License
 MIT License. Developed for research and educational purposes.
+
