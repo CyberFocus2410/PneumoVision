@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
   const { user, role, isAuthenticated, logout } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const patientHash = '0x8f4c21e07b7194f2d348b29a';
   const patientDisplay = '0x8f4c...b29a';
@@ -14,17 +22,28 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const formattedTime = currentTime.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }) + ' ' + currentTime.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-dicom-surface text-dicom-text-primary select-none font-sans border-b border-dicom-border shadow-md">
+    <header className="sticky top-0 z-50 w-full bg-[#0B132B] text-slate-100 select-none font-sans border-b border-slate-800 shadow-lg">
       {/* Upper Navigation Strip (h-14) */}
-      <div className="h-14 w-full px-space-md flex items-center justify-between border-b border-dicom-border">
-        {/* Brand Logo & Node / Patient Identifiers */}
-        <div className="flex items-center gap-space-md">
+      <div className="h-14 w-full px-4 md:px-6 flex items-center justify-between">
+        {/* Brand Logo & Node / Live Timestamp */}
+        <div className="flex items-center gap-3 md:gap-4">
           <div
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
             onClick={() => setActiveTab('screening')}
           >
-            <div className="w-8 h-8 rounded bg-[#070A0F] border border-dicom-border flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-8 h-8 rounded bg-[#070A0F] border border-slate-700/80 flex items-center justify-center shrink-0 shadow-inner group-hover:border-cyan-500/50 transition-colors">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect width="24" height="24" rx="3" fill="#070A0F" />
                 <path d="M6 12h12M12 6v12" stroke="#006781" strokeWidth="2" strokeLinecap="square" />
@@ -36,47 +55,53 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
               <span className="font-bold text-[17px] tracking-tight text-white whitespace-nowrap leading-none">
                 Pneumo<span className="text-[#8FDFFF]">Vision</span>
               </span>
-              <span className="px-1.5 py-0.5 bg-[#1E293B] text-[#94A3B8] text-[9px] font-mono font-semibold tracking-wider rounded border border-dicom-border">
+              <span className="px-1.5 py-0.5 bg-[#1E293B] text-cyan-300 text-[9px] font-mono font-semibold tracking-wider rounded border border-slate-700">
                 CLINICAL
               </span>
             </div>
           </div>
 
-          <span className="font-label-sm text-label-sm bg-primary-container text-secondary-container border border-dicom-border px-space-xs py-0.5 rounded font-mono font-medium">
-            NODE #04-MST_TESTNET
-          </span>
+          <div className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 bg-slate-900/90 text-cyan-400 border border-slate-800 rounded font-mono text-[11px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span>NODE #04-MST_TESTNET</span>
+          </div>
 
-          <div className="hidden sm:flex items-center gap-space-xs bg-dicom-canvas px-space-sm py-1 rounded border border-dicom-border">
-            <span className="font-label-sm text-label-sm text-dicom-text-secondary">PATIENT:</span>
-            <span className="font-code-hash text-code-hash text-dicom-text-primary" title={patientHash}>
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-slate-900/90 text-slate-300 border border-slate-800 rounded font-mono text-[11px]">
+            <span className="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+            <span className="text-cyan-200 font-semibold">{formattedTime}</span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800 text-xs">
+            <span className="text-slate-400 font-medium">PATIENT:</span>
+            <span className="font-mono text-slate-200 font-medium" title={patientHash}>
               {patientDisplay}
             </span>
             <button
               type="button"
               onClick={handleCopyPatient}
-              className="text-dicom-text-secondary hover:text-dicom-text-primary p-0.5 ml-0.5 cursor-pointer"
+              className="text-slate-400 hover:text-white p-0.5 ml-0.5 cursor-pointer transition-colors"
               title="Copy Patient Address"
             >
-              <span className="material-symbols-outlined text-[14px]">
+              <span className="material-symbols-outlined text-[13px]">
                 {copied ? 'check' : 'content_copy'}
               </span>
             </button>
-            <span className="inline-flex items-center gap-1 font-label-sm text-label-sm text-status-verified bg-status-verified-bg/10 border border-status-verified/40 px-1 py-0.5 rounded ml-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-status-verified" />
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-1.5 py-0.5 rounded ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               CONSENT ACTIVE
             </span>
           </div>
         </div>
 
         {/* Center Nav Tabs */}
-        <nav className="hidden lg:flex items-center h-full gap-space-xs">
+        <nav className="hidden lg:flex items-center h-full gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('screening')}
-            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-4 text-[13px] font-medium transition-all ${
               activeTab === 'screening'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
-                : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
+                ? 'bg-slate-900 text-cyan-300 border-b-2 border-cyan-400 font-semibold shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             AI Diagnostic Screening
@@ -85,10 +110,10 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
           <button
             type="button"
             onClick={() => setActiveTab('access')}
-            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-4 text-[13px] font-medium transition-all ${
               activeTab === 'access'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
-                : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
+                ? 'bg-slate-900 text-cyan-300 border-b-2 border-cyan-400 font-semibold shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             Patient Access &amp; Consents
@@ -97,10 +122,10 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-4 text-[13px] font-medium transition-all ${
               activeTab === 'history'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
-                : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
+                ? 'bg-slate-900 text-cyan-300 border-b-2 border-cyan-400 font-semibold shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             Care History Ledger
@@ -109,10 +134,10 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
           <button
             type="button"
             onClick={() => setActiveTab('tamper')}
-            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-4 text-[13px] font-medium transition-all ${
               activeTab === 'tamper'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
-                : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
+                ? 'bg-slate-900 text-cyan-300 border-b-2 border-cyan-400 font-semibold shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             Tamper Audit &amp; Integrity
@@ -120,36 +145,36 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
         </nav>
 
         {/* Right Status & Attending Clinician Profile */}
-        <div className="flex items-center gap-space-md">
-          <div className="hidden xl:flex items-center gap-space-sm border-r border-dicom-border pr-space-md font-label-sm text-label-sm">
-            <div className="flex items-center gap-1 text-dicom-text-secondary">
-              <span className="w-2 h-2 rounded-full bg-status-verified animate-pulse" />
-              <span>:4731 Synced</span>
+        <div className="flex items-center gap-3 md:gap-4">
+          <div className="hidden 2xl:flex items-center gap-2 border-r border-slate-800 pr-4 text-xs">
+            <div className="flex items-center gap-1 text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono text-[11px]">:4731 Synced</span>
             </div>
-            <div className="flex items-center gap-1 text-dicom-text-secondary">
-              <span className="material-symbols-outlined text-[14px] text-secondary">memory</span>
-              <span>DenseNet-121 Ready</span>
+            <div className="flex items-center gap-1 text-slate-300 ml-2">
+              <span className="material-symbols-outlined text-[14px] text-cyan-400">memory</span>
+              <span className="font-mono text-[11px]">DenseNet-121 Ready</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-space-sm">
+          <div className="flex items-center gap-2.5">
             <div className="text-right hidden sm:block">
-              <div className="font-headline-sm text-headline-sm text-dicom-text-primary leading-none">
+              <div className="text-xs font-semibold text-slate-100 leading-none">
                 {user?.full_name || 'Dr. Vivan, MD'}
               </div>
-              <div className="font-label-sm text-label-sm text-dicom-text-secondary mt-0.5">
+              <div className="text-[10px] text-slate-400 mt-0.5">
                 Radiology Dept · Bay 3
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center border border-dicom-border">
-              <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
+            <div className="w-8 h-8 rounded-full bg-cyan-950 border border-cyan-700/60 flex items-center justify-center text-cyan-300 shadow-sm">
+              <span className="material-symbols-outlined text-[18px]">person</span>
             </div>
             {isAuthenticated ? (
               <button
                 type="button"
                 onClick={logout}
                 title="Sign Out"
-                className="p-1 text-dicom-text-secondary hover:text-alert-tamper transition-colors ml-1"
+                className="p-1.5 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">lock_reset</span>
               </button>
@@ -157,7 +182,7 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
               <button
                 type="button"
                 onClick={() => onOpenAuth('DOCTOR', 'login')}
-                className="px-2 py-1 bg-secondary text-on-primary font-headline-sm text-xs rounded hover:bg-secondary/90 transition-colors ml-1"
+                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs rounded transition-all shadow-sm"
               >
                 Sign In
               </button>
@@ -167,52 +192,35 @@ export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
       </div>
 
       {/* Mobile Nav Drawer Row */}
-      <div className="lg:hidden flex items-center justify-around h-9 bg-dicom-surface border-b border-dicom-border text-xs px-space-sm overflow-x-auto">
+      <div className="lg:hidden flex items-center justify-around h-9 bg-slate-900/95 border-t border-slate-800 text-xs px-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('screening')}
-          className={`px-space-sm py-1 font-medium ${activeTab === 'screening' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-3 py-1 font-medium rounded transition-colors ${activeTab === 'screening' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-400'}`}
         >
           Screening
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('access')}
-          className={`px-space-sm py-1 font-medium ${activeTab === 'access' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-3 py-1 font-medium rounded transition-colors ${activeTab === 'access' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-400'}`}
         >
           Consents
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`px-space-sm py-1 font-medium ${activeTab === 'history' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-3 py-1 font-medium rounded transition-colors ${activeTab === 'history' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-400'}`}
         >
           Care Ledger
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('tamper')}
-          className={`px-space-sm py-1 font-medium ${activeTab === 'tamper' ? 'bg-surface-card text-alert-tamper' : 'text-dicom-text-secondary'}`}
+          className={`px-3 py-1 font-medium rounded transition-colors ${activeTab === 'tamper' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-400'}`}
         >
           Tamper Audit
         </button>
-      </div>
-
-      {/* Regulatory Notice Banner (h-7) */}
-      <div className="h-7 w-full bg-status-caution-bg border-b border-status-caution-border px-space-md flex items-center justify-between text-status-caution">
-        <div className="flex items-center gap-space-xs font-label-md text-label-md truncate">
-          <span className="material-symbols-outlined text-[16px] shrink-0">warning</span>
-          <span className="font-headline-sm text-headline-sm uppercase tracking-wider text-status-caution shrink-0">
-            Regulatory Notice:
-          </span>
-          <span className="font-body-sm text-body-sm text-text-secondary truncate">
-            Research/educational screening aid only — DenseNet-121 v1.02 binary classifier. Not cleared by FDA/CE for primary diagnostic use. Radiologist or attending physician review strictly required.
-          </span>
-        </div>
-        <div className="hidden md:flex items-center gap-space-xs font-label-sm text-label-sm text-text-secondary shrink-0 pl-2">
-          <span className="material-symbols-outlined text-[13px]">verified</span>
-          <span>MST Testnet Protocol</span>
-        </div>
       </div>
     </header>
   );

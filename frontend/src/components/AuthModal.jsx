@@ -12,7 +12,6 @@ import {
   Wallet,
   AlertCircle,
   Loader2,
-  Sparkles,
   CheckCircle2,
   Shield
 } from 'lucide-react';
@@ -93,8 +92,8 @@ export default function AuthModal({ isOpen, onClose, initialRole = 'DOCTOR', ini
   const handleQuickFillDoctor = () => {
     setRole('DOCTOR');
     setMode('login');
-    setEmail('doc@pneumovision.ai');
-    setPassword('DocPassword123!');
+    setEmail('doctor@pneumovision.ai');
+    setPassword('DoctorPassword2026!');
   };
 
   const handleQuickFillAdmin = () => {
@@ -112,426 +111,298 @@ export default function AuthModal({ isOpen, onClose, initialRole = 'DOCTOR', ini
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content auth-modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg bg-[#0F172A] border border-slate-700/80 rounded-2xl shadow-2xl p-6 text-slate-100 my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="logo-icon" style={{ width: '28px', height: '28px' }}>
-              <Shield size={16} />
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-cyan-950/80 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+              <Shield size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <h2 className="text-base font-bold text-white leading-tight">
                 {mode === 'login' ? 'Sign In to PneumoVision' : 'Create Clinical Account'}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Zero-Knowledge Medical Cryptography & PACS Authentication
-              </div>
+              </h2>
+              <p className="text-xs text-slate-400">
+                PACS Authentication &amp; MST Testnet Protocol
+              </p>
             </div>
           </div>
-          <button className="tool-btn" onClick={onClose} style={{ padding: '4px' }}>
-            <X size={16} />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <X size={18} />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="mt-4 flex flex-col gap-4">
           {/* Main Mode Toggle: Sign In vs Register */}
-          <div className="intelligence-mode-toggle" style={{ margin: 0 }}>
+          <div className="grid grid-cols-2 gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
             <button
               type="button"
-              className={`mode-toggle-btn ${mode === 'login' ? 'active' : ''}`}
+              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'login'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
               onClick={() => { setMode('login'); setError(null); }}
             >
-              <KeyRound size={13} /> Sign In
+              <KeyRound size={14} /> Sign In
             </button>
             <button
               type="button"
-              className={`mode-toggle-btn ${mode === 'signup' ? 'active' : ''}`}
+              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'signup'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
               onClick={() => { setMode('signup'); setError(null); }}
             >
-              <User size={13} /> Create Account
+              <User size={14} /> Create Account
             </button>
           </div>
 
-          {/* Role Sub-Toggle: Patient vs Physician */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px',
-            background: 'var(--bg-card)',
-            padding: '4px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)'
-          }}>
+          {/* Role Sub-Toggle: Physician vs Patient */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-900/50 p-1 rounded-xl border border-slate-800/80">
             <button
               type="button"
               onClick={() => { setRole('DOCTOR'); setError(null); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px',
-                borderRadius: 'var(--radius-xs)',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                background: role === 'DOCTOR' ? 'var(--cyan-glow)' : 'transparent',
-                color: role === 'DOCTOR' ? 'var(--cyan-primary)' : 'var(--text-secondary)',
-                borderBottom: role === 'DOCTOR' ? '2px solid var(--cyan-primary)' : '2px solid transparent'
-              }}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                role === 'DOCTOR'
+                  ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
             >
-              <Stethoscope size={14} /> Physician / Doctor
+              <Stethoscope size={15} /> Physician / Doctor
             </button>
 
             <button
               type="button"
               onClick={() => { setRole('PATIENT'); setError(null); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px',
-                borderRadius: 'var(--radius-xs)',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                background: role === 'PATIENT' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
-                color: role === 'PATIENT' ? 'var(--emerald-success)' : 'var(--text-secondary)',
-                borderBottom: role === 'PATIENT' ? '2px solid var(--emerald-success)' : '2px solid transparent'
-              }}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                role === 'PATIENT'
+                  ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
             >
-              <User size={14} /> Patient Portal
+              <User size={15} /> Patient Portal
             </button>
           </div>
 
-          {/* Notice Banner */}
+          {/* Notices */}
           {mode === 'signup' && role === 'DOCTOR' && (
-            <div style={{
-              background: 'var(--amber-bg)',
-              border: '1px solid var(--amber-warning)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.72rem',
-              color: 'var(--amber-warning)',
-              display: 'flex',
-              gap: '6px',
-              alignItems: 'flex-start'
-            }}>
-              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div className="bg-amber-950/40 border border-amber-500/40 p-3 rounded-lg text-xs text-amber-200 flex items-start gap-2">
+              <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-400" />
               <div>
-                <strong>Physician Verification Required:</strong> New doctor accounts undergo administrative audit before on-chain authorization in <code>PatientRecords.sol</code>.
+                <strong>Physician Verification Required:</strong> New doctor accounts undergo administrative audit before on-chain authorization.
               </div>
             </div>
           )}
 
           {mode === 'signup' && role === 'PATIENT' && (
-            <div style={{
-              background: 'var(--emerald-bg)',
-              border: '1px solid var(--emerald-success)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.72rem',
-              color: 'var(--emerald-success)',
-              display: 'flex',
-              gap: '6px',
-              alignItems: 'flex-start'
-            }}>
-              <ShieldCheck size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div className="bg-emerald-950/40 border border-emerald-500/40 p-3 rounded-lg text-xs text-emerald-200 flex items-start gap-2">
+              <ShieldCheck size={16} className="shrink-0 mt-0.5 text-emerald-400" />
               <div>
-                <strong>Zero PII On-Chain:</strong> A cryptographically salted pseudonymous <code>patient_id</code> will be generated and registered on-chain. Your name and email are never committed to the blockchain.
+                <strong>Pseudonymous On-Chain Identity:</strong> A private pseudonymous ID is generated. Personal identifiable information is never stored unencrypted on-chain.
               </div>
             </div>
           )}
 
-          {error && (
-            <div style={{
-              background: 'var(--crimson-bg)',
-              border: '1px solid var(--crimson-alert)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.74rem',
-              color: '#f87171',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <AlertCircle size={15} /> {error}
-            </div>
-          )}
-
-          {successMsg && (
-            <div style={{
-              background: 'var(--emerald-bg)',
-              border: '1px solid var(--emerald-success)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.74rem',
-              color: 'var(--emerald-success)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <CheckCircle2 size={15} /> {successMsg}
-            </div>
-          )}
-
           {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             {mode === 'signup' && (
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                  Full Legal Name
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <User size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+                <label className="block text-xs font-medium text-slate-300 mb-1">Full Legal Name</label>
+                <div className="relative">
+                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     type="text"
                     required
-                    placeholder={role === 'DOCTOR' ? 'Dr. Sarah Lin, MD' : 'Alex Morgan'}
+                    placeholder={role === 'DOCTOR' ? 'Dr. Sarah Smith, MD' : 'Alex Johnson'}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px 8px 32px',
-                      background: 'var(--bg-app)',
-                      border: '1px solid var(--border-medium)',
-                      borderRadius: 'var(--radius-xs)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.8rem'
-                    }}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                Email Address
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+              <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="email"
                   required
-                  placeholder="physician@hospital.org"
+                  placeholder={role === 'DOCTOR' ? 'physician@hospital.org' : 'patient@example.com'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px 8px 32px',
-                    background: 'var(--bg-app)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: 'var(--radius-xs)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.8rem'
-                  }}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+              <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="password"
                   required
-                  minLength={6}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px 8px 32px',
-                    background: 'var(--bg-app)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: 'var(--radius-xs)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.8rem'
-                  }}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
 
-            {/* Doctor Signup Additional Fields */}
             {mode === 'signup' && role === 'DOCTOR' && (
               <>
                 <div>
-                  <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    MST Testnet Wallet Address (Required for On-Chain Signatures)
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Wallet size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Medical License Number</label>
+                  <div className="relative">
+                    <FileBadge size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. MD-91562037"
+                      value={medicalLicense}
+                      onChange={(e) => setMedicalLicense(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Hospital / Clinical Affiliation</label>
+                  <div className="relative">
+                    <Building size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="e.g. MetroHealth Radiology Department"
+                      value={hospitalAffiliation}
+                      onChange={(e) => setHospitalAffiliation(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">MST Testnet Provider Wallet Address</label>
+                  <div className="relative">
+                    <Wallet size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
                       required
                       placeholder="0xb3C09303335393D511F9eE1C7Bf4f1154904142b"
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px 8px 32px',
-                        background: 'var(--bg-app)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: 'var(--radius-xs)',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.76rem',
-                        fontFamily: 'var(--font-mono)'
-                      }}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                     />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      Medical License #
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <FileBadge size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
-                      <input
-                        type="text"
-                        required
-                        placeholder="MD-98421-CXR"
-                        value={medicalLicense}
-                        onChange={(e) => setMedicalLicense(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px 8px 32px',
-                          background: 'var(--bg-app)',
-                          border: '1px solid var(--border-medium)',
-                          borderRadius: 'var(--radius-xs)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.8rem'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      Hospital Affiliation
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Building size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
-                      <input
-                        type="text"
-                        placeholder="Johns Hopkins"
-                        value={hospitalAffiliation}
-                        onChange={(e) => setHospitalAffiliation(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px 8px 32px',
-                          background: 'var(--bg-app)',
-                          border: '1px solid var(--border-medium)',
-                          borderRadius: 'var(--radius-xs)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.8rem'
-                        }}
-                      />
-                    </div>
                   </div>
                 </div>
               </>
             )}
 
-            {/* Patient Signup Optional Wallet */}
             {mode === 'signup' && role === 'PATIENT' && (
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                  Linked Wallet Address (Optional — can be linked later for BridgeKey)
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Wallet size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+                <label className="block text-xs font-medium text-slate-300 mb-1">MST Testnet Patient Wallet (Optional)</label>
+                <div className="relative">
+                  <Wallet size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     type="text"
-                    placeholder="0x... (optional)"
+                    placeholder="0x... (Leave empty to auto-generate)"
                     value={walletAddress}
                     onChange={(e) => setWalletAddress(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px 8px 32px',
-                      background: 'var(--bg-app)',
-                      border: '1px solid var(--border-medium)',
-                      borderRadius: 'var(--radius-xs)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.76rem',
-                      fontFamily: 'var(--font-mono)'
-                    }}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
             )}
 
+            {/* Error and Success alerts */}
+            {error && (
+              <div className="p-3 bg-red-950/40 border border-red-500/50 rounded-lg text-xs text-red-200 flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0 text-red-400" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-950/40 border border-emerald-500/50 rounded-lg text-xs text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="pacs-btn-primary"
-              style={{ width: '100%', marginTop: '6px', padding: '10px' }}
+              className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md mt-2 ${
+                role === 'DOCTOR'
+                  ? 'bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700'
+                  : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isLoading ? (
                 <>
-                  <Loader2 size={16} className="status-dot" /> Authenticating...
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Processing...</span>
                 </>
               ) : mode === 'login' ? (
                 <>
-                  <KeyRound size={15} /> Sign In as {role === 'DOCTOR' ? 'Physician' : 'Patient'}
+                  <KeyRound size={15} />
+                  <span>Sign In as {role === 'DOCTOR' ? 'Physician' : 'Patient'}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={15} /> Register {role === 'DOCTOR' ? 'Physician Account' : 'Patient Identity'}
+                  <User size={15} />
+                  <span>Create {role === 'DOCTOR' ? 'Physician' : 'Patient'} Account</span>
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Logins for Fast Reviewer Testing */}
-          {mode === 'login' && (
-            <div style={{
-              borderTop: '1px solid var(--border-subtle)',
-              paddingTop: '10px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-                Fast Reviewer Quick-Fill Logins
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={handleQuickFillDoctor}
-                  className="pacs-tool-btn"
-                  style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                >
-                  <Stethoscope size={12} color="var(--cyan-primary)" /> Doctor (Dr. Sarah)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleQuickFillAdmin}
-                  className="pacs-tool-btn"
-                  style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                >
-                  <ShieldCheck size={12} color="var(--emerald-success)" /> Admin (Hospital)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleQuickFillPatient}
-                  className="pacs-tool-btn"
-                  style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                >
-                  <User size={12} color="var(--amber-warning)" /> Demo Patient
-                </button>
-              </div>
+          {/* Quick-Fill Presets for Quick Testing */}
+          <div className="pt-3 border-t border-slate-800">
+            <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2">
+              Fast Reviewer Quick-Fill Logins
             </div>
-          )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleQuickFillDoctor}
+                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-[11px] text-cyan-300 rounded-lg transition-colors font-medium"
+              >
+                Doctor (Dr. Vivan)
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickFillAdmin}
+                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-[11px] text-purple-300 rounded-lg transition-colors font-medium"
+              >
+                Admin (Hospital)
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickFillPatient}
+                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-[11px] text-emerald-300 rounded-lg transition-colors font-medium"
+              >
+                Demo Patient
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

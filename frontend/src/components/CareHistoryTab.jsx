@@ -183,7 +183,7 @@ export default function CareHistoryTab() {
                     <img
                       className="w-full h-28 object-cover rounded opacity-90"
                       alt="CXR with Grad-CAM Activation"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCO7fVGDOJxAOeJDg-BhN5y4lTCORVg90VfW6WyQeZkGDrrQdeAiHH5fJD4PNlnAhAbCBKmqLRe01RBV978yyhh4k_OxiK0y4PJIJtl_OrbZ-32nuC_nozqqt4w2kb2_7h8l8WQ1b_1zFG-un5--1Qcz8ng4crlguoD8pPB3lhpXjP_AwuQgcuy6yyAN6ZmjDw5x_c_vEWJp2_Dd3onGqkCeIzsDxaQ1Z93K8c46YzHn79fVOA4m5Fs"
+                      src="/static/samples/sample_pneumonia.png"
                     />
                     <div className="flex items-center justify-between font-label-sm text-label-sm text-dicom-text-secondary mt-1 px-1">
                       <span>Grad-CAM Activation</span>

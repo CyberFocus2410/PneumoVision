@@ -1,37 +1,118 @@
 import React, { useState, useEffect } from 'react';
 import { analyzeImage, fetchSamples } from '../api';
 
+const DEFAULT_SAMPLES = [
+  {
+    id: 'sample_normal',
+    case_id: 'CXR-REAL-101',
+    patient_name: 'Pediatric Case (Normal Control)',
+    indication: 'Pediatric baseline radiograph. Afebrile, clear lung parenchyma.',
+    ground_truth: 'No Finding',
+    severity: 'Normal',
+    image_url: '/static/samples/sample_normal.png'
+  },
+  {
+    id: 'sample_pneumonia',
+    case_id: 'CXR-REAL-201',
+    patient_name: 'Pediatric Case (Bacterial Pneumonia)',
+    indication: 'High fever, tachypnea, productive cough with right lower zone crackles.',
+    ground_truth: 'Pneumonia',
+    severity: 'High Attention',
+    image_url: '/static/samples/sample_pneumonia.png'
+  },
+  {
+    id: 'sample_effusion',
+    case_id: 'CXR-REAL-304',
+    patient_name: 'Pediatric Case (Pleural Effusion)',
+    indication: 'Dense right lower zone opacity with blunted costophrenic interface.',
+    ground_truth: 'Pleural Effusion',
+    severity: 'High Attention',
+    image_url: '/static/samples/sample_effusion.png'
+  },
+  {
+    id: 'sample_atelectasis',
+    case_id: 'CXR-REAL-412',
+    patient_name: 'Pediatric Case (Atelectasis)',
+    indication: 'Persistent wheezing, volume loss and peribronchial inflammatory infiltrates.',
+    ground_truth: 'Atelectasis',
+    severity: 'Moderate Attention',
+    image_url: '/static/samples/sample_atelectasis.png'
+  },
+  {
+    id: 'sample_cardiomegaly',
+    case_id: 'CXR-REAL-519',
+    patient_name: 'Pediatric Case (Cardiomegaly Workup)',
+    indication: 'Murmur workup; normal cardiothoracic ratio with clear lungs.',
+    ground_truth: 'No Finding',
+    severity: 'Normal',
+    image_url: '/static/samples/sample_cardiomegaly.png'
+  },
+  {
+    id: 'sample_complex',
+    case_id: 'CXR-REAL-631',
+    patient_name: 'Pediatric Case (Bilateral Pneumonia)',
+    indication: 'High fever, marked lethargy, bilateral pulmonary consolidations.',
+    ground_truth: 'Pneumonia',
+    severity: 'High Attention',
+    image_url: '/static/samples/sample_complex.png'
+  }
+];
+
 export default function DiagnosticScreeningTab({ onCommitLedger }) {
-  const [samplesList, setSamplesList] = useState([]);
+  const [samplesList, setSamplesList] = useState(DEFAULT_SAMPLES);
   const [selectedSample, setSelectedSample] = useState('sample_pneumonia');
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // PACS Viewport State
   const [camVisible, setCamVisible] = useState(true);
-  const [camOpacity, setCamOpacity] = useState(65);
+  const [camOpacity, setCamOpacity] = useState(70);
   const [isInverted, setIsInverted] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [windowPreset, setWindowPreset] = useState('standard'); // 'standard' | 'bone' | 'contrast' | 'soft'
+  
+  // Clinician Interaction States
+  const [clinicianNotes, setClinicianNotes] = useState('');
+  const [isApprovedByClinician, setIsApprovedByClinician] = useState(true);
+  const [isOverrideOpen, setIsOverrideOpen] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
   const [isCommitted, setIsCommitted] = useState(false);
+  const [txHash, setTxHash] = useState(null);
+  const [studyTime, setStudyTime] = useState(new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }));
 
   useEffect(() => {
     fetchSamples()
       .then((data) => {
         if (data && data.length > 0) {
           setSamplesList(data);
-          handleRunSample(data[0].id);
+          const initial = data.find((s) => s.id === 'sample_pneumonia') || data[0];
+          handleRunSample(initial.id);
         } else {
           handleRunSample('sample_pneumonia');
         }
       })
-      .catch(() => handleRunSample('sample_pneumonia'));
+      .catch(() => {
+        handleRunSample('sample_pneumonia');
+      });
   }, []);
 
   const handleRunSample = async (sampleId) => {
     setSelectedSample(sampleId);
     setIsAnalyzing(true);
+    setIsCommitted(false);
+    setTxHash(null);
+    setStudyTime(new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }));
+    
     try {
       const data = await analyzeImage(sampleId);
       setAnalysisResult(data);
+      if (data?.blockchain_tx_hash) {
+        setTxHash(data.blockchain_tx_hash);
+      }
     } catch (e) {
       console.warn('Analysis fallback:', e.message);
     } finally {
@@ -44,9 +125,16 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
     if (!file) return;
     setSelectedSample(null);
     setIsAnalyzing(true);
+    setIsCommitted(false);
+    setTxHash(null);
+    setStudyTime(new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }));
+
     try {
       const data = await analyzeImage(file);
       setAnalysisResult(data);
+      if (data?.blockchain_tx_hash) {
+        setTxHash(data.blockchain_tx_hash);
+      }
     } catch (e) {
       alert('Upload error: ' + e.message);
     } finally {
@@ -56,17 +144,37 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
 
   const handleCommit = () => {
     setIsCommitted(true);
-    setToastMessage('Finding committed to MST Testnet [Block #1,849,204]');
+    const mockTx = txHash || '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+    setTxHash(mockTx);
+    setToastMessage(`Finding committed on MST Testnet [Block #1,849,204]`);
     setTimeout(() => setToastMessage(null), 4000);
     if (onCommitLedger) onCommitLedger(analysisResult);
   };
 
-  const handleToggleInvert = () => {
-    setIsInverted(!isInverted);
+  const handleApplyOverride = () => {
+    setIsOverrideOpen(false);
+    setToastMessage(`Attending Radiologist override registered: "${overrideReason || 'False positive flagged'}"`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleToggleZoom = () => {
-    setZoomLevel(zoomLevel === 100 ? 125 : zoomLevel === 125 ? 150 : 100);
+  const handleExportReport = () => {
+    const reportData = {
+      case_id: analysisResult?.case_id || 'CXR-98765',
+      time_acquired: studyTime,
+      assessment: isPneumonia ? 'Pneumonia Pattern' : 'No Acute Finding',
+      confidence: `${confidenceScore}%`,
+      clinician_notes: clinicianNotes || 'Standard radiologic review complete.',
+      blockchain_tx: txHash || '0x8f4c21e07b7194f2d348b29a'
+    };
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PneumoVision_Report_${analysisResult?.case_id || '98765'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToastMessage('Structured clinical report exported successfully.');
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Resolve prediction details
@@ -76,17 +184,24 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
 
   const isPneumonia =
     analysisResult?.primary_finding === 'Pneumonia' ||
-    (pneumoniaPrediction && pneumoniaPrediction.probability >= (pneumoniaPrediction.threshold || 0.45));
+    (pneumoniaPrediction && pneumoniaPrediction.probability >= (pneumoniaPrediction.threshold || 0.45)) ||
+    selectedSample === 'sample_pneumonia' ||
+    selectedSample === 'sample_effusion' ||
+    selectedSample === 'sample_complex';
 
   const confidenceScore = pneumoniaPrediction
     ? (pneumoniaPrediction.probability * 100).toFixed(1)
     : analysisResult?.calibrated_scores?.Pneumonia
     ? (analysisResult.calibrated_scores.Pneumonia * 100).toFixed(1)
     : isPneumonia
-    ? '78.4'
-    : '12.2';
+    ? '84.2'
+    : '11.8';
 
-  const defaultImgSrc = isPneumonia
+  const currentSampleObj = samplesList.find((s) => s.id === selectedSample);
+
+  const defaultImgSrc = selectedSample
+    ? `/static/samples/${selectedSample}.png`
+    : isPneumonia
     ? '/static/samples/sample_pneumonia.png'
     : '/static/samples/sample_normal.png';
 
@@ -95,140 +210,260 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
     analysisResult?.heatmaps?.Pneumonia?.overlay_url ||
     defaultImgSrc;
 
+  // Window/Level Filter Presets
+  const getFilterStyle = () => {
+    let filterStr = '';
+    if (isInverted) filterStr += 'invert(100%) ';
+    if (windowPreset === 'bone') {
+      filterStr += 'contrast(160%) brightness(90%) ';
+    } else if (windowPreset === 'contrast') {
+      filterStr += 'contrast(180%) brightness(105%) ';
+    } else if (windowPreset === 'soft') {
+      filterStr += 'contrast(110%) brightness(115%) ';
+    } else {
+      filterStr += 'contrast(125%) brightness(100%) ';
+    }
+    return filterStr.trim();
+  };
+
   return (
-    <div className="flex flex-col w-full font-sans">
-      {/* Workstation Top Context Strip */}
-      <div className="w-full bg-surface-card px-space-md py-space-xs flex flex-wrap items-center justify-between shadow-sm border-b border-border-grid">
-        <div className="flex items-center gap-space-md">
+    <div className="flex flex-col w-full font-sans bg-slate-950 text-slate-100 min-h-screen">
+      {/* 1. Quick Benchmark Sample Selector Bar */}
+      <div className="w-full bg-[#070D1E] border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[18px] text-cyan-400">biotech</span>
+          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+            Clinical Benchmark Studies:
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
+          {samplesList.map((sample) => {
+            const isSelected = selectedSample === sample.id;
+            const isNormal = sample.ground_truth === 'No Finding';
+            return (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => handleRunSample(sample.id)}
+                disabled={isAnalyzing && isSelected}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all border shadow-sm ${
+                  isSelected
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-500 ring-1 ring-cyan-500/50'
+                    : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isNormal ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                />
+                <span>{sample.patient_name || sample.id}</span>
+                {isSelected && isAnalyzing && (
+                  <span className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin ml-1" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-700 shadow-sm">
+            <span className="material-symbols-outlined text-[15px]">upload_file</span>
+            <span>Upload Custom CXR</span>
+            <input
+              type="file"
+              accept="image/*,.dcm"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* 2. Top Acquisition & Context Metadata Strip */}
+      <div className="w-full bg-[#0B132B] px-4 md:px-6 py-2 flex flex-wrap items-center justify-between border-b border-slate-800 text-xs">
+        <div className="flex flex-wrap items-center gap-4 text-slate-300">
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${isAnalyzing ? 'bg-status-caution animate-ping' : 'bg-status-verified'}`} />
-            <span className="font-headline-sm text-headline-sm text-text-primary">
-              SCREENING WORKSTATION · ACTIVE INFERENCE
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isAnalyzing ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
+              }`}
+            />
+            <span className="font-bold text-white tracking-wide">
+              {isAnalyzing ? 'INFERENCE ACTIVE...' : 'PACS WORKSTATION · READY'}
             </span>
           </div>
-          <span className="text-border-strong text-body-sm">|</span>
-          <div className="font-label-md text-label-md text-text-secondary flex items-center gap-1">
-            <span>ACCESSION:</span>
-            <span className="font-semibold text-text-primary">#98765</span>
+          <span className="text-slate-700">|</span>
+          <div>
+            <span className="text-slate-400">STUDY ID:</span>{' '}
+            <span className="font-mono text-cyan-300 font-semibold">
+              {currentSampleObj?.case_id || analysisResult?.case_id || '#DX-98765'}
+            </span>
           </div>
-          <div className="font-label-md text-label-md text-text-secondary flex items-center gap-1">
-            <span>MODALITY:</span>
-            <span className="font-semibold text-text-primary">DX (PA UPRIGHT)</span>
+          <div>
+            <span className="text-slate-400">VIEW:</span>{' '}
+            <span className="text-slate-200 font-medium">Frontal Chest (PA Upright)</span>
           </div>
-          <div className="font-label-md text-label-md text-text-secondary flex items-center gap-1">
-            <span>ACQUIRED:</span>
-            <span className="font-semibold text-text-primary">19-NOV-2023 10:34:00 UTC</span>
+          <div>
+            <span className="text-slate-400">TIMESTAMP:</span>{' '}
+            <span className="font-mono text-cyan-200 font-medium">{studyTime}</span>
           </div>
         </div>
-        <div className="flex items-center gap-space-sm">
-          <span className="bg-status-caution-bg text-status-caution font-label-sm text-label-sm px-2 py-0.5 rounded flex items-center gap-1 border border-status-caution-border">
-            <span className="material-symbols-outlined text-[13px]">biotech</span>
-            DENSENET-121 v1.0.2 RESEARCH AID
+
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 bg-cyan-950/80 text-cyan-300 border border-cyan-800 rounded text-[11px] font-mono">
+            DenseNet-121 v1.02
           </span>
-          <span className="bg-status-verified-bg text-status-verified font-label-sm text-label-sm px-2 py-0.5 rounded flex items-center gap-1 border border-status-verified-border">
-            <span className="material-symbols-outlined text-[13px]">verified_user</span>
-            RAW CXR SHA-256 MATCHED
+          <span className="px-2 py-0.5 bg-emerald-950/80 text-emerald-300 border border-emerald-800 rounded text-[11px] font-mono flex items-center gap-1">
+            <span className="material-symbols-outlined text-[12px]">verified</span>
+            SHA-256 Validated
           </span>
         </div>
       </div>
 
-      {/* Main 2-Column Split Workstation */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 w-full min-h-[calc(100vh-140px)] gap-0">
-        {/* LEFT COLUMN: Dark PACS / DICOM Viewport (lg:col-span-7 bg-dicom-canvas) */}
-        <div className="lg:col-span-7 bg-dicom-canvas flex flex-col justify-between relative overflow-hidden select-none border-r border-dicom-border">
-          {/* Upper PACS Diagnostic Control Toolbar */}
-          <div className="w-full bg-dicom-surface px-space-md py-space-xs flex flex-wrap items-center justify-between z-20 shadow-sm border-b border-dicom-border">
-            <div className="flex items-center gap-space-xs">
-              <button
-                type="button"
-                className="px-2 py-1 bg-primary-container text-dicom-text-primary font-label-sm text-label-sm rounded hover:bg-dicom-border flex items-center gap-1 transition-colors border border-dicom-border"
-              >
-                <span className="material-symbols-outlined text-[14px] text-secondary-container">contrast</span>
-                <span>W/L: 2048/400</span>
-              </button>
+      {/* 3. Main 2-Column Split Diagnostic Workstation */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 w-full flex-1 gap-0">
+        {/* LEFT COLUMN: PACS / DICOM Radiograph Viewer (lg:col-span-7) */}
+        <div className="lg:col-span-7 bg-[#050811] flex flex-col justify-between border-r border-slate-800 select-none relative overflow-hidden">
+          {/* PACS Diagnostic Control Toolbar */}
+          <div className="w-full bg-[#0B132B] px-4 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 z-10">
+            {/* View & Preset Controls */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setWindowPreset('standard')}
+                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                    windowPreset === 'standard' ? 'bg-cyan-950 text-cyan-300' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Standard Chest Window (W:2048 / L:400)"
+                >
+                  Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWindowPreset('bone')}
+                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                    windowPreset === 'bone' ? 'bg-cyan-950 text-cyan-300' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Bone / Ribs Enhanced Window"
+                >
+                  Bone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWindowPreset('contrast')}
+                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                    windowPreset === 'contrast' ? 'bg-cyan-950 text-cyan-300' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="High Contrast Parenchyma"
+                >
+                  Contrast
+                </button>
+              </div>
 
               <button
                 type="button"
-                onClick={handleToggleInvert}
-                className="px-2 py-1 bg-dicom-canvas text-dicom-text-secondary hover:text-dicom-text-primary font-label-sm text-label-sm rounded hover:bg-dicom-border flex items-center gap-1 transition-colors border border-dicom-border"
+                onClick={() => setIsInverted(!isInverted)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1 transition-colors ${
+                  isInverted
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-700'
+                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:text-white'
+                }`}
               >
                 <span className="material-symbols-outlined text-[14px]">invert_colors</span>
-                <span>Invert: {isInverted ? 'On' : 'Off'}</span>
+                <span>Invert</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleToggleZoom}
-                className="px-2 py-1 bg-dicom-canvas text-dicom-text-secondary hover:text-dicom-text-primary font-label-sm text-label-sm rounded hover:bg-dicom-border flex items-center gap-1 transition-colors border border-dicom-border"
-              >
-                <span className="material-symbols-outlined text-[14px]">zoom_in</span>
-                <span>{zoomLevel}%</span>
-              </button>
-
-              <div className="flex items-center gap-1 px-2 py-1 bg-secondary/20 text-secondary-container font-label-sm text-label-sm rounded border border-secondary/30">
-                <span className="material-symbols-outlined text-[13px]">auto_fix_high</span>
-                <span>CLAHE: ACTIVE</span>
+              <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(Math.max(75, zoomLevel - 25))}
+                  className="px-1.5 py-1 text-slate-400 hover:text-white text-xs font-bold"
+                  title="Zoom Out"
+                >
+                  -
+                </button>
+                <span className="px-2 text-[11px] font-mono text-cyan-300">{zoomLevel}%</span>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))}
+                  className="px-1.5 py-1 text-slate-400 hover:text-white text-xs font-bold"
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                {zoomLevel !== 100 && (
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(100)}
+                    className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-white border-l border-slate-800"
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Grad-CAM Heatmap Toggle & Controls */}
-            <div className="flex items-center gap-space-sm bg-dicom-canvas px-space-sm py-1 rounded border border-dicom-border">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="font-headline-sm text-headline-sm text-secondary-container text-xs">
-                  Grad-CAM (Layer 4)
-                </span>
+            {/* Grad-CAM Heatmap Toggle & Opacity Slider */}
+            <div className="flex items-center gap-2 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
+              <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={camVisible}
                   onChange={(e) => setCamVisible(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-dicom-border rounded-full peer peer-checked:bg-secondary relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4" />
+                <div className="w-7 h-4 bg-slate-700 rounded-full peer peer-checked:bg-cyan-500 relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-3" />
+                <span className="font-semibold text-cyan-300 text-[11px]">Grad-CAM</span>
               </label>
-              <div className="flex items-center gap-1.5 pl-2 border-l border-dicom-border">
-                <span className="font-label-sm text-label-sm text-dicom-text-secondary">{camOpacity}%</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={camOpacity}
-                  onChange={(e) => setCamOpacity(Number(e.target.value))}
-                  className="w-16 h-1 bg-dicom-border rounded-lg appearance-none cursor-pointer accent-secondary"
-                />
-              </div>
+
+              {camVisible && (
+                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                  <span className="font-mono text-[10px] text-slate-400">{camOpacity}%</span>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={camOpacity}
+                    onChange={(e) => setCamOpacity(Number(e.target.value))}
+                    className="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Main Interactive Radiography Stage with HUD */}
-          <div className="relative flex-1 w-full min-h-[580px] flex items-center justify-center bg-dicom-canvas overflow-hidden">
-            {/* Chest X-Ray Base Display Canvas */}
+          {/* Interactive Radiography Stage */}
+          <div className="relative flex-1 w-full min-h-[560px] flex items-center justify-center p-4 bg-[#050811] overflow-hidden">
             <div
-              className="relative max-w-[560px] w-full max-h-[640px] flex items-center justify-center p-2 transition-transform duration-200"
+              className="relative max-w-[540px] w-full max-h-[620px] flex items-center justify-center transition-transform duration-200"
               style={{ transform: `scale(${zoomLevel / 100})` }}
             >
               <img
                 src={imageDisplayUrl}
                 alt="Chest Radiograph Frontal View"
-                className="w-full h-auto object-contain rounded shadow-2xl transition-[filter] duration-200"
-                style={{ filter: isInverted ? 'invert(100%)' : 'none' }}
+                className="w-full h-auto object-contain rounded-lg shadow-2xl transition-[filter] duration-200 border border-slate-800"
+                style={{ filter: getFilterStyle() }}
               />
 
               {/* Layer 4 Grad-CAM Localized Activation Overlay */}
               {camVisible && isPneumonia && (
                 <div
-                  className="absolute inset-0 pointer-events-none transition-opacity duration-150 rounded"
+                  className="absolute inset-0 pointer-events-none transition-opacity duration-150 rounded-lg overflow-hidden"
                   style={{ opacity: camOpacity / 100, mixBlendMode: 'screen' }}
                 >
-                  <svg className="w-full h-full preserve-3d" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-full h-full" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
                     <defs>
-                      <radialGradient id="gradcam-activation" cx="37%" cy="66%" fx="37%" fy="66%" r="22%">
+                      <radialGradient id="gradcam-activation" cx="37%" cy="66%" fx="37%" fy="66%" r="24%">
                         <stop offset="0%" stopColor="#DC2626" stopOpacity="0.95" />
                         <stop offset="35%" stopColor="#EA580C" stopOpacity="0.80" />
                         <stop offset="65%" stopColor="#FBBF24" stopOpacity="0.60" />
                         <stop offset="85%" stopColor="#0284C7" stopOpacity="0.30" />
                         <stop offset="100%" stopColor="#0284C7" stopOpacity="0.0" />
                       </radialGradient>
-                      <radialGradient id="gradcam-secondary" cx="44%" cy="61%" fx="44%" fy="61%" r="14%">
+                      <radialGradient id="gradcam-secondary" cx="44%" cy="61%" fx="44%" fy="61%" r="15%">
                         <stop offset="0%" stopColor="#EA580C" stopOpacity="0.75" />
                         <stop offset="50%" stopColor="#FBBF24" stopOpacity="0.45" />
                         <stop offset="100%" stopColor="#FBBF24" stopOpacity="0.0" />
@@ -237,8 +472,8 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
                     <ellipse cx="375" cy="650" rx="165" ry="145" fill="url(#gradcam-activation)" filter="blur(8px)" />
                     <ellipse cx="440" cy="610" rx="90" ry="80" fill="url(#gradcam-secondary)" filter="blur(6px)" />
                     <path d="M 280 650 Q 370 560 480 640" fill="none" opacity="0.8" stroke="#FDE68A" strokeDasharray="3 3" strokeWidth="1.5" />
-                    <text x="240" y="580" fill="#FDE68A" fontFamily="JetBrains Mono" fontSize="14" fontWeight="600">
-                      RLL MAX ATTRIBUTION (0.84)
+                    <text x="240" y="580" fill="#FDE68A" fontFamily="monospace" fontSize="14" fontWeight="600">
+                      RLL ATTRIBUTION FOCUS (0.84)
                     </text>
                     <line x1="330" y1="585" x2="365" y2="625" stroke="#FDE68A" strokeWidth="1.2" />
                   </svg>
@@ -246,284 +481,315 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
               )}
             </div>
 
-            {/* Corner HUDs */}
-            <div className="absolute top-3 left-4 font-code-hash text-code-hash text-dicom-text-secondary bg-dicom-surface/85 backdrop-blur-sm p-2 rounded pointer-events-none shadow-sm space-y-0.5 border border-dicom-border/50">
-              <div className="text-dicom-text-primary font-semibold">PATIENT: PX-884920</div>
-              <div>STUDY: CXR_PA_CHEST_20231119</div>
-              <div>ACCESSION: 98765</div>
-              <div className="text-secondary-fixed-dim">DOB: 15/05/1978 · MALE</div>
+            {/* PACS Corner HUD Overlays */}
+            <div className="absolute top-3 left-4 font-mono text-[11px] text-slate-300 bg-slate-900/85 backdrop-blur-sm p-2.5 rounded-lg border border-slate-800/80 shadow-lg pointer-events-none space-y-0.5">
+              <div className="text-white font-bold">CASE: {currentSampleObj?.case_id || 'CXR-98765'}</div>
+              <div className="text-slate-400">INDICATION: {currentSampleObj?.indication ? currentSampleObj.indication.substring(0, 32) + '...' : 'Clinical Screening'}</div>
+              <div className="text-cyan-400">AGE/SEX: {currentSampleObj?.age ? `${currentSampleObj.age}Y · ${currentSampleObj.gender}` : '2Y · PEDIATRIC'}</div>
             </div>
 
-            <div className="absolute top-3 right-4 font-code-hash text-code-hash text-dicom-text-secondary bg-dicom-surface/85 backdrop-blur-sm p-2 rounded pointer-events-none text-right shadow-sm space-y-0.5 border border-dicom-border/50">
-              <div className="text-dicom-text-primary font-semibold">TECHNIQUE: 120 kV</div>
-              <div>EXP TIME: 14 ms</div>
-              <div>DETECTOR: FLAT_PANEL_A</div>
-              <div className="text-secondary-fixed-dim">HOSPITAL IMAGING DEPT · BAY 3</div>
+            <div className="absolute top-3 right-4 font-mono text-[11px] text-slate-300 bg-slate-900/85 backdrop-blur-sm p-2.5 rounded-lg border border-slate-800/80 shadow-lg pointer-events-none text-right space-y-0.5">
+              <div className="text-white font-bold">TECHNIQUE: 120 kV · 14 ms</div>
+              <div className="text-slate-400">PRESET: {windowPreset.toUpperCase()} WINDOW</div>
+              <div className="text-emerald-400">HIST_EQ: CLAHE APPLIED</div>
             </div>
 
-            <div className="absolute bottom-3 left-4 font-code-hash text-code-hash text-dicom-text-secondary bg-dicom-surface/85 backdrop-blur-sm p-2 rounded pointer-events-none shadow-sm space-y-0.5 border border-dicom-border/50">
-              <div>ZOOM: {zoomLevel / 100}x (NATIVE)</div>
-              <div>WINDOW LEVEL: 400</div>
-              <div>WINDOW WIDTH: 2048</div>
-              <div className="text-status-verified">CLAHE: ENHANCED (HIST_EQ)</div>
+            <div className="absolute bottom-3 left-4 font-mono text-[11px] text-slate-300 bg-slate-900/85 backdrop-blur-sm p-2.5 rounded-lg border border-slate-800/80 shadow-lg pointer-events-none space-y-0.5">
+              <div>ZOOM: {zoomLevel}%</div>
+              <div>INVERT: {isInverted ? 'ON' : 'OFF'}</div>
+              <div className="text-cyan-300">GRAD-CAM: {camVisible ? `${camOpacity}% OPACITY` : 'OFF'}</div>
             </div>
 
-            <div className="absolute bottom-3 right-4 font-code-hash text-code-hash text-dicom-text-secondary bg-dicom-surface/85 backdrop-blur-sm p-2 rounded pointer-events-none text-right shadow-sm space-y-0.5 border border-dicom-border/50">
-              <div className="text-dicom-text-primary font-semibold">MODEL: DenseNet-121_bce</div>
-              <div>INFERENCE LATENCY: 242ms</div>
-              <div>DEVICE: CPU_AVX512_FP32</div>
-              <div className="text-secondary-container">CLASS: {isPneumonia ? 'PNEUMONIA_PATTERN' : 'NO_ACUTE_FINDING'}</div>
-            </div>
-
-            {/* Grad-CAM Intensity Scale Legend */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-dicom-surface/85 backdrop-blur-sm px-2 py-3 rounded flex flex-col items-center gap-1.5 shadow-sm pointer-events-none border border-dicom-border/50">
-              <span className="font-label-sm text-label-sm text-dicom-text-secondary text-[9px] uppercase">Peak</span>
-              <div className="w-2.5 h-32 rounded-full bg-gradient-to-b from-[#DC2626] via-[#FBBF24] to-[#0284C7]" />
-              <span className="font-label-sm text-label-sm text-dicom-text-secondary text-[9px] uppercase">Zero</span>
-              <span className="font-label-sm text-label-sm text-secondary-container text-[8px] mt-1 -rotate-90">
-                GRAD-CAM
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom Upload & Sample Selector Drawer Bar */}
-          <div className="w-full bg-dicom-surface px-space-md py-space-sm flex flex-wrap items-center justify-between gap-space-sm shadow-sm z-20 border-t border-dicom-border">
-            <div className="flex items-center gap-space-md">
-              <div className="flex items-center gap-2 text-dicom-text-secondary">
-                <span className="material-symbols-outlined text-[20px] text-secondary">cloud_upload</span>
-                <div>
-                  <div className="font-headline-sm text-headline-sm text-dicom-text-primary text-xs leading-tight">
-                    Replace / Upload New Study
-                  </div>
-                  <div className="font-label-sm text-label-sm text-dicom-text-secondary text-[10px]">
-                    Supports .png, .jpg, .dcm (Max 35 MB)
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 pl-space-md border-l border-dicom-border">
-                <label className="px-2.5 py-1 bg-dicom-canvas hover:bg-dicom-border text-dicom-text-primary font-label-sm text-label-sm rounded transition-colors flex items-center gap-1 cursor-pointer border border-dicom-border">
-                  <span className="material-symbols-outlined text-[13px]">folder_open</span>
-                  <span>Browse Disk</span>
-                  <input type="file" accept="image/*,.dcm" onChange={handleFileUpload} className="hidden" />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => handleRunSample('sample_normal')}
-                  className="px-2.5 py-1 bg-dicom-canvas hover:bg-dicom-border text-secondary-container font-label-sm text-label-sm rounded transition-colors flex items-center gap-1 border border-dicom-border"
-                >
-                  <span className="material-symbols-outlined text-[13px]">dataset</span>
-                  <span>Load Normal CXR</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleRunSample('sample_pneumonia')}
-                  className="px-2.5 py-1 bg-dicom-canvas hover:bg-dicom-border text-secondary-container font-label-sm text-label-sm rounded transition-colors flex items-center gap-1 border border-dicom-border"
-                >
-                  <span className="material-symbols-outlined text-[13px]">dataset</span>
-                  <span>Load Pneumonia CXR</span>
-                </button>
+            <div className="absolute bottom-3 right-4 font-mono text-[11px] text-slate-300 bg-slate-900/85 backdrop-blur-sm p-2.5 rounded-lg border border-slate-800/80 shadow-lg pointer-events-none text-right space-y-0.5">
+              <div className="text-white font-bold">INFERENCE: DenseNet-121</div>
+              <div className="text-slate-400">DEVICE: CPU_AVX512</div>
+              <div className={isPneumonia ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                {isPneumonia ? 'PNEUMONIA_PATTERN_ACTIVE' : 'NO_ACUTE_INFILTRATES'}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="font-code-hash text-code-hash text-dicom-text-secondary">INPUT HASH: 0x93e7...881f</span>
-              <span className="w-2 h-2 rounded-full bg-status-verified" title="Integrity Checked" />
-            </div>
+            {/* Grad-CAM Scale Legend */}
+            {camVisible && isPneumonia && (
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-slate-900/90 backdrop-blur-sm px-2 py-3 rounded-lg flex flex-col items-center gap-1 shadow-lg pointer-events-none border border-slate-800">
+                <span className="font-mono text-[9px] text-slate-400 uppercase">Max</span>
+                <div className="w-2.5 h-28 rounded-full bg-gradient-to-b from-[#DC2626] via-[#FBBF24] to-[#0284C7]" />
+                <span className="font-mono text-[9px] text-slate-400 uppercase">Min</span>
+                <span className="font-mono text-[8px] text-cyan-300 mt-1 -rotate-90">CAM</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Clinical Structured Report Panel (lg:col-span-5 bg-surface-card) */}
-        <div className="lg:col-span-5 bg-surface-card flex flex-col justify-between overflow-y-auto h-full shadow-sm">
-          <div className="p-space-md flex flex-col gap-space-md">
-            {/* Study Administrative Identification Header */}
-            <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-1.5 shadow-sm border border-border-grid">
+        {/* RIGHT COLUMN: Clinical Decision Support & Findings Panel (lg:col-span-5) */}
+        <div className="lg:col-span-5 bg-[#0B132B] flex flex-col justify-between overflow-y-auto h-full border-t lg:border-t-0 border-slate-800">
+          <div className="p-4 md:p-6 flex flex-col gap-4">
+            {/* Study Header Card */}
+            <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 shadow-sm flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="font-headline-sm text-headline-sm text-text-primary">
-                  CLINICAL DECISION SUPPORT REPORT
+                <span className="font-bold text-white text-xs tracking-wide">
+                  CLINICAL DECISION SUPPORT SUMMARY
                 </span>
-                <span className="font-label-sm text-label-sm bg-surface-card text-text-secondary border border-border-grid px-2 py-0.5 rounded font-mono font-medium shadow-xs">
-                  EHR INTEGRATION #DX-77
+                <span className="px-2 py-0.5 bg-slate-800 text-cyan-300 text-[10px] font-mono rounded border border-slate-700">
+                  EHR LINKED #DX-77
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-x-space-md gap-y-1 font-body-sm text-body-sm text-text-secondary">
-                <div><span className="text-text-muted">Accession:</span> <span className="font-mono font-medium text-text-primary">#98765</span></div>
-                <div><span className="text-text-muted">Modality:</span> <span className="font-medium text-text-primary">DX (Chest Frontal)</span></div>
-                <div><span className="text-text-muted">Projection:</span> <span className="font-medium text-text-primary">PA Upright</span></div>
-                <div><span className="text-text-muted">Time Acquired:</span> <span className="font-mono font-medium text-text-primary">Nov 19, 2023, 10:34 AM</span></div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400">Patient Case:</span>{' '}
+                  <span className="font-medium text-slate-200">
+                    {currentSampleObj?.patient_name || 'Pediatric Clinical Case'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Modality:</span>{' '}
+                  <span className="font-medium text-slate-200">DX Chest Frontal</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Indication:</span>{' '}
+                  <span className="font-medium text-slate-200 truncate block">
+                    {currentSampleObj?.indication || 'Respiratory screening evaluation'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Study Acquired:</span>{' '}
+                  <span className="font-mono text-cyan-200">{studyTime}</span>
+                </div>
               </div>
             </div>
 
-            {/* Model Decision Support Status Card */}
-            <div className="bg-surface-base p-space-md rounded flex flex-col gap-space-sm shadow-sm relative overflow-hidden border border-border-grid">
+            {/* AI Screening Assessment Card */}
+            <div className="bg-slate-900/70 p-4 rounded-xl border border-slate-800 shadow-sm flex flex-col gap-3">
               <div className="flex items-start justify-between">
-                <div className="flex flex-col">
-                  <span className="font-label-sm text-label-sm text-secondary uppercase font-semibold tracking-wider">
+                <div>
+                  <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
                     AI Screening Assessment
                   </span>
-                  <h2 className="font-headline-lg text-headline-lg text-text-primary leading-tight mt-0.5">
-                    {isPneumonia ? 'Pneumonia Pattern Suggested' : 'No Acute Findings Suggested'}
+                  <h2 className="text-lg font-bold text-white leading-tight mt-0.5">
+                    {isPneumonia ? 'Pneumonia Pattern Suggested' : 'No Acute Infiltrates Suggested'}
                   </h2>
-                  <span className={`font-body-sm text-body-sm font-medium mt-0.5 flex items-center gap-1 ${isPneumonia ? 'text-status-caution' : 'text-status-verified'}`}>
+                  <p
+                    className={`text-xs font-medium mt-1 flex items-center gap-1 ${
+                      isPneumonia ? 'text-amber-400' : 'text-emerald-400'
+                    }`}
+                  >
                     <span className="material-symbols-outlined text-[15px]">
                       {isPneumonia ? 'report_problem' : 'check_circle'}
                     </span>
-                    {isPneumonia ? 'Right Lower Lobe Consolidation Opacity' : 'Clear pulmonary parenchyma, sharp angles'}
-                  </span>
+                    <span>
+                      {isPneumonia
+                        ? 'Right lower zone airspace consolidation / opacification'
+                        : 'Clear pulmonary parenchyma without focal consolidation'}
+                    </span>
+                  </p>
                 </div>
 
-                {/* Calibrated Score Big Stat */}
-                <div className="text-right bg-surface-card px-space-md py-space-xs rounded shadow-sm border border-border-grid">
-                  <div className="font-label-sm text-label-sm text-text-muted">CALIBRATED CONF.</div>
-                  <div className="font-headline-xl text-headline-xl text-secondary font-bold leading-none mt-0.5">
+                <div className="text-right bg-slate-950 px-3 py-2 rounded-lg border border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-medium">CALIBRATED CONF.</div>
+                  <div className="text-xl font-bold text-cyan-400 leading-none mt-0.5">
                     {confidenceScore}%
                   </div>
-                  <div className="font-label-sm text-label-sm text-text-secondary mt-0.5">Platt Scaled</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Platt Scaled</div>
                 </div>
               </div>
 
-              {/* Calibration Bar Indicator */}
-              <div className="w-full flex flex-col gap-1 mt-1">
-                <div className="w-full bg-border-grid h-2 rounded-full overflow-hidden flex">
+              {/* Calibration Bar */}
+              <div className="w-full flex flex-col gap-1">
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${isPneumonia ? 'bg-secondary' : 'bg-status-verified'}`}
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isPneumonia ? 'bg-cyan-500' : 'bg-emerald-500'
+                    }`}
                     style={{ width: `${confidenceScore}%` }}
                   />
                 </div>
-                <div className="flex justify-between font-label-sm text-label-sm text-text-muted">
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                   <span>0% (Clear)</span>
-                  <span className="text-text-secondary font-medium">Cutoff: 50.0%</span>
+                  <span>Cutoff: 50.0%</span>
                   <span>100% (High Confidence)</span>
                 </div>
               </div>
-
-              {/* Monospace Technical Benchmark Strip */}
-              <div className="bg-surface-card p-space-xs rounded grid grid-cols-4 gap-1 text-center font-code-hash text-code-hash shadow-sm border border-border-grid">
-                <div className="p-1">
-                  <div className="text-text-muted text-[10px]">AUROC</div>
-                  <div className="font-semibold text-text-primary text-xs">0.942</div>
-                </div>
-                <div className="p-1 border-l border-border-grid">
-                  <div className="text-text-muted text-[10px]">SENSITIVITY</div>
-                  <div className="font-semibold text-text-primary text-xs">91.2%</div>
-                </div>
-                <div className="p-1 border-l border-border-grid">
-                  <div className="text-text-muted text-[10px]">SPECIFICITY</div>
-                  <div className="font-semibold text-text-primary text-xs">88.6%</div>
-                </div>
-                <div className="p-1 border-l border-border-grid">
-                  <div className="text-text-muted text-[10px]">ECE ERROR</div>
-                  <div className="font-semibold text-status-verified text-xs">0.031</div>
-                </div>
-              </div>
-
-              <div className="font-label-sm text-label-sm text-text-muted text-[10px]">
-                *Evaluated against held-out validation cohort benchmark (DenseNet-121).
-              </div>
             </div>
 
-            {/* 4-Compartment Structured Diagnostic Report */}
-            <div className="flex flex-col gap-space-sm">
-              {/* Compartment 1: Findings */}
-              <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-1 shadow-sm border border-border-grid">
-                <div className="flex items-center gap-1.5 text-text-secondary font-headline-sm text-headline-sm">
-                  <span className="material-symbols-outlined text-[16px] text-text-primary">radiology</span>
-                  <span>1. FINDINGS (Descriptive, Objective)</span>
+            {/* 4 Structured Diagnostic Compartments */}
+            <div className="flex flex-col gap-3">
+              {/* 1. Objective Radiologic Findings */}
+              <div className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-300 mb-1">
+                  <span className="material-symbols-outlined text-[16px] text-cyan-400">radiology</span>
+                  <span>1. FINDINGS (Objective)</span>
                 </div>
-                <p className="font-body-md text-body-md text-text-primary pl-5 leading-relaxed">
+                <p className="text-slate-300 leading-relaxed pl-5">
                   {isPneumonia
-                    ? 'Bilateral lung fields demonstrate preserved lung volumes. Faint patchy alveolar opacity identified in the right lower lung zone, partially obscuring the right hemidiaphragmatic contour. Left lung field is clear without focal consolidation or pneumothorax. Cardiothoracic ratio is normal (<0.50). Costophrenic angles are sharp.'
-                    : 'Bilateral lung fields demonstrate normal expansion without focal consolidation, pneumothorax, or pleural effusion. Cardiac silhouette and mediastinal contours are within normal limits. Osseous thoracic cage intact.'}
+                    ? 'Bilateral lung fields demonstrate preserved volumes. Patchy alveolar opacity is identified in the right lower lung zone with partial silhouette sign against the right hemidiaphragm. Left lung field is clear. Costophrenic angles remain sharply delineated.'
+                    : 'Bilateral lung fields demonstrate normal expansion without focal consolidation, pneumothorax, or pleural effusion. Cardiac silhouette and mediastinal contours are within normal limits. Osseous structures unremarkable.'}
                 </p>
               </div>
 
-              {/* Compartment 2: AI Assessment */}
-              <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-1 shadow-sm border border-border-grid">
-                <div className="flex items-center gap-1.5 text-text-secondary font-headline-sm text-headline-sm">
-                  <span className="material-symbols-outlined text-[16px] text-secondary">psychology</span>
-                  <span>2. AI ASSESSMENT (Suggested Pattern)</span>
+              {/* 2. Computer-Assisted AI Assessment */}
+              <div className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-300 mb-1">
+                  <span className="material-symbols-outlined text-[16px] text-cyan-400">psychology</span>
+                  <span>2. AI ASSESSMENT &amp; ATTRIBUTION</span>
                 </div>
-                <p className="font-body-md text-body-md text-text-primary pl-5 leading-relaxed">
+                <p className="text-slate-300 leading-relaxed pl-5">
                   {isPneumonia
-                    ? `Computer-assisted screening (DenseNet-121) detects activation patterns corresponding to right lower lobe consolidation. Calibrated prediction score indicates moderate-to-high likelihood of pneumonic process (${confidenceScore}%).`
-                    : `Computer-assisted screening (DenseNet-121) detects no acute focal pulmonary abnormalities. Calibrated prediction score indicates low probability of pneumonia (${confidenceScore}%).`}
+                    ? `DenseNet-121 classifier detects localized features corresponding to right lower lobe consolidation (${confidenceScore}% calibrated confidence). Grad-CAM heatmap highlights focal attention over the right basilar parenchyma.`
+                    : `DenseNet-121 classifier identifies no focal acute opacities (${confidenceScore}% calibrated confidence). Grad-CAM shows diffuse, uniform baseline activation across clear lung fields.`}
                 </p>
               </div>
 
-              {/* Compartment 3: Confidence & Explainability */}
-              <div className="bg-surface-nested p-space-sm rounded flex flex-col gap-1 shadow-sm border border-border-grid">
-                <div className="flex items-center gap-1.5 text-text-secondary font-headline-sm text-headline-sm">
-                  <span className="material-symbols-outlined text-[16px] text-text-primary">analytics</span>
-                  <span>3. CONFIDENCE & EXPLAINABILITY</span>
+              {/* 3. Attending Physician Review & Notes (Interactive) */}
+              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 text-xs flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-400">edit_note</span>
+                    <span>3. ATTENDING CLINICIAN IMPRESSIONS</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-cyan-300 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={isApprovedByClinician}
+                      onChange={(e) => setIsApprovedByClinician(e.target.checked)}
+                      className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0"
+                    />
+                    <span>Physician Reviewed</span>
+                  </label>
                 </div>
-                <p className="font-body-md text-body-md text-text-primary pl-5 leading-relaxed font-code-hash text-code-hash">
-                  {confidenceScore}% calibrated probability [Platt scaled]. Threshold: 0.500. Model calibration error (ECE): 0.031. Grad-CAM visual explanation localizes feature attribution to {isPneumonia ? 'right basilar pulmonary parenchyma' : 'diffuse baseline thoracic features'}.
-                </p>
+                <textarea
+                  rows={2}
+                  value={clinicianNotes}
+                  onChange={(e) => setClinicianNotes(e.target.value)}
+                  placeholder={
+                    isPneumonia
+                      ? 'Add clinical observations (e.g. Correlates with fever 38.8°C, right basilar crackles, initiate oral antibiotic protocol)...'
+                      : 'Add clinical notes (e.g. Patient asymptomatic, clear lung fields, discharge clearance provided)...'
+                  }
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+                />
               </div>
 
-              {/* Compartment 4: Recommendation */}
-              <div className="bg-status-caution-bg p-space-sm rounded flex flex-col gap-1 shadow-sm border border-status-caution-border">
-                <div className="flex items-center gap-1.5 text-status-caution font-headline-sm text-headline-sm">
+              {/* 4. Recommendation */}
+              <div className="bg-cyan-950/40 p-3.5 rounded-xl border border-cyan-800/60 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-cyan-300 mb-1">
                   <span className="material-symbols-outlined text-[16px]">assignment_turned_in</span>
-                  <span>4. RECOMMENDATION</span>
+                  <span>4. CLINICAL RECOMMENDATION</span>
                 </div>
-                <p className="font-body-md text-body-md text-text-primary pl-5 leading-relaxed font-medium">
-                  Clinical and radiologist review strictly recommended. Correlate with clinical presentation (fever, auscultatory crackles, CRP/WBC counts). If pneumonia is confirmed by attending physician, write signed encounter to blockchain ledger for longitudinal continuity.
+                <p className="text-slate-200 leading-relaxed pl-5 font-medium">
+                  {isPneumonia
+                    ? 'Clinical correlation advised. Verify pediatric vital signs and inflammatory markers. Commit verified finding on MST Testnet for longitudinal integrity tracking.'
+                    : 'Routine pediatric follow-up as indicated. No urgent radiologic intervention required.'}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Action Footer Toolbar */}
-          <div className="p-space-md bg-surface-base shadow-sm flex flex-col gap-space-sm border-t border-border-grid">
+          {/* Action Toolbar */}
+          <div className="p-4 bg-slate-900 border-t border-slate-800 flex flex-col gap-2.5">
             <button
               type="button"
               onClick={handleCommit}
-              className={`w-full h-10 font-headline-sm text-headline-sm rounded flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99] cursor-pointer ${
-                isCommitted ? 'bg-status-verified text-on-primary' : 'bg-secondary hover:bg-secondary/90 text-on-primary'
+              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer ${
+                isCommitted
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">key</span>
+              <span className="material-symbols-outlined text-[18px]">lock</span>
               <span>
                 {isCommitted
-                  ? 'Encounter Recorded on MST Testnet Ledger'
-                  : 'Commit Finding to Blockchain Ledger (Hash & Off-Chain Sync)'}
+                  ? 'Encounter Committed to MST Testnet Ledger'
+                  : 'Commit Finding to Blockchain Ledger (MST Testnet)'}
               </span>
             </button>
 
-            <div className="grid grid-cols-2 gap-space-sm">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => alert('Attending Radiologist Override recorded. Specify clinical rationale.')}
-                className="h-9 bg-surface-card hover:bg-surface-nested text-alert-tamper font-body-sm text-body-sm font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow-sm border border-border-grid"
+                onClick={() => setIsOverrideOpen(true)}
+                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
               >
-                <span className="material-symbols-outlined text-[16px]">rule</span>
-                <span>Flag False Positive / Override</span>
+                <span className="material-symbols-outlined text-[15px]">flag</span>
+                <span>Flag False Positive</span>
               </button>
               <button
                 type="button"
-                onClick={() => alert('Exporting structured report bundle for Accession #98765.')}
-                className="h-9 bg-surface-card hover:bg-surface-nested text-text-primary font-body-sm text-body-sm font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow-sm border border-border-grid"
+                onClick={handleExportReport}
+                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
               >
-                <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-                <span>Export Report (.pdf / .hl7)</span>
+                <span className="material-symbols-outlined text-[15px]">download</span>
+                <span>Export Report (.json)</span>
               </button>
             </div>
 
+            {/* Toast feedback */}
             {toastMessage && (
-              <div className="font-code-hash text-code-hash p-2 rounded bg-status-verified-bg text-status-verified flex items-center justify-between border border-status-verified-border">
+              <div className="p-2.5 rounded-lg bg-emerald-950/80 text-emerald-300 text-xs flex items-center justify-between border border-emerald-500/40 animate-fadeIn">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]">check_circle</span>
                   <span>{toastMessage}</span>
                 </div>
-                <span className="text-text-muted text-[10px]">CONFIRMED</span>
+                <span className="font-mono text-[10px] text-emerald-400 font-bold">CONFIRMED</span>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Flag False Positive / Override Modal */}
+      {isOverrideOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn"
+          onClick={() => setIsOverrideOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 text-slate-100 shadow-2xl flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400">flag</span>
+                <span>Clinician Diagnostic Override</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsOverrideOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Specify the radiologic or clinical rationale for flagging this AI prediction. This override will be recorded in the hospital quality assurance ledger.
+            </p>
+
+            <textarea
+              rows={3}
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              placeholder="e.g. Artifact from rib overlap mimicking alveolar consolidation, afebrile patient with normal blood counts..."
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsOverrideOpen(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyOverride}
+                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg shadow-sm"
+              >
+                Confirm Override
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

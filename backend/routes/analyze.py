@@ -31,6 +31,80 @@ def get_engine() -> PneumoInferenceEngine:
     return _engine
 
 
+@router.get("/samples")
+async def list_sample_cases():
+    """Returns the list of available verified clinical benchmark CXR cases."""
+    import json
+    manifest_path = SAMPLES_DIR / "sample_manifest.json"
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                samples = json.load(f)
+                for s in samples:
+                    s["image_url"] = f"/static/samples/{s['id']}.png"
+                return samples
+        except Exception as e:
+            print(f"Error loading sample manifest: {e}")
+
+    # Fallback default samples if manifest is unavailable
+    return [
+        {
+            "id": "sample_pneumonia",
+            "case_id": "CXR-REAL-201",
+            "patient_name": "Pediatric Case (Bacterial Pneumonia)",
+            "indication": "High fever, tachypnea, productive cough with right lower zone crackles.",
+            "ground_truth": "Pneumonia",
+            "severity": "High Attention",
+            "image_url": "/static/samples/sample_pneumonia.png"
+        },
+        {
+            "id": "sample_normal",
+            "case_id": "CXR-REAL-101",
+            "patient_name": "Pediatric Case (Normal Control)",
+            "indication": "Pediatric baseline radiograph. Afebrile, clear lung parenchyma.",
+            "ground_truth": "No Finding",
+            "severity": "Normal",
+            "image_url": "/static/samples/sample_normal.png"
+        },
+        {
+            "id": "sample_effusion",
+            "case_id": "CXR-REAL-304",
+            "patient_name": "Pediatric Case (Pleural Effusion)",
+            "indication": "Dense right lower zone opacity with blunted costophrenic interface.",
+            "ground_truth": "Pleural Effusion",
+            "severity": "High Attention",
+            "image_url": "/static/samples/sample_effusion.png"
+        },
+        {
+            "id": "sample_atelectasis",
+            "case_id": "CXR-REAL-412",
+            "patient_name": "Pediatric Case (Atelectasis)",
+            "indication": "Persistent wheezing, volume loss and peribronchial inflammatory infiltrates.",
+            "ground_truth": "Atelectasis",
+            "severity": "Moderate Attention",
+            "image_url": "/static/samples/sample_atelectasis.png"
+        },
+        {
+            "id": "sample_cardiomegaly",
+            "case_id": "CXR-REAL-519",
+            "patient_name": "Pediatric Case (Cardiomegaly Workup)",
+            "indication": "Murmur workup; normal cardiothoracic ratio with clear lungs.",
+            "ground_truth": "No Finding",
+            "severity": "Normal",
+            "image_url": "/static/samples/sample_cardiomegaly.png"
+        },
+        {
+            "id": "sample_complex",
+            "case_id": "CXR-REAL-631",
+            "patient_name": "Pediatric Case (Bilateral Pneumonia)",
+            "indication": "High fever, marked lethargy, bilateral pulmonary consolidations.",
+            "ground_truth": "Pneumonia",
+            "severity": "High Attention",
+            "image_url": "/static/samples/sample_complex.png"
+        }
+    ]
+
+
 @router.post("/analyze")
 async def analyze_xray(
     file: Optional[UploadFile] = File(None),
