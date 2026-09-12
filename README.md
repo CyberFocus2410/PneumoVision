@@ -26,9 +26,12 @@
    - Generates pixel-level heatmaps pinpointing pulmonary consolidations and airspace opacities.
    - Interactive blending, side-by-side view, and opacity adjustment in the radiologist workstation viewer.
 
-4. **Blockchain-Backed Consent & Care Timeline**:
-   - Decentralized consent management via **`PatientRecords.sol`** on a local Hardhat network.
+4. **Blockchain-Backed Consent & Care Timeline (Live on MST Testnet)**:
+   - Decentralized consent management via **`PatientRecords.sol`** deployed live on **MST Testnet (Chain ID: `91562037`)**.
+   - Contract Address: [`0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6`](https://testnet.mstscan.com/address/0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6)
+   - Verifiable Deployment Tx: [`0x8154d786...073d`](https://testnet.mstscan.com/tx/0x8154d78602f13039799c391ac2eeef58ebb3bba357ff5a111ea4454c82cf073d)
    - Tracks full care progression: **Diagnosis → Treatment → Medication → Outcome**, with cryptographic hash verification and tamper detection. (See [BLOCKCHAIN.md](file:///c:/Users/Vivan/OneDrive/Documents/PROJECTS/PneumoVision/BLOCKCHAIN.md)).
+
 
 5. **Longitudinal Study Progression Analysis**:
    - Compare prior baseline vs follow-up radiographs to monitor disease trajectory (Marked Progression, Improvement, Resolution, Stable).
@@ -86,14 +89,32 @@ cd PneumoVision
 pip install -r requirements.txt
 ```
 
-### 2. Run Local Hardhat Node & Deploy Contract (Optional for Blockchain)
+### 2. Run Local Hardhat Node & Deploy Contract (Optional for Local Dev)
 ```bash
 npx hardhat node
 npx hardhat run blockchain/scripts/deploy.js --network localhost
 ```
 
-### 3. Launch Application
+### 3. MST Testnet Deployment (Live)
+PneumoVision's `PatientRecords.sol` is deployed live on **MST Testnet**:
+- **Network Name**: `MST Testnet`
+- **RPC Endpoint**: `https://testnetrpc.mstblockchain.com`
+- **Chain ID**: `91562037`
+- **Currency**: `tMSTC`
+- **Smart Contract Address**: [`0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6`](https://testnet.mstscan.com/address/0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6)
+- **Deployment Tx**: [`0x8154d78602f13039799c391ac2eeef58ebb3bba357ff5a111ea4454c82cf073d`](https://testnet.mstscan.com/tx/0x8154d78602f13039799c391ac2eeef58ebb3bba357ff5a111ea4454c82cf073d)
+- **Patient Registration Tx**: [`0x810a749a1f00da4e8418599d5d6933e99a2fe2cf2b775be247642dc920613e9e`](https://testnet.mstscan.com/tx/0x810a749a1f00da4e8418599d5d6933e99a2fe2cf2b775be247642dc920613e9e)
+- **Diagnosis Record Tx**: [`0x2df2ca0ff29c0c7a4bc3e97ff42e9e7238fd7949619a1b0aa098f2c0d9204a36`](https://testnet.mstscan.com/tx/0x2df2ca0ff29c0c7a4bc3e97ff42e9e7238fd7949619a1b0aa098f2c0d9204a36)
+- **Explorer**: [testnet.mstscan.com](https://testnet.mstscan.com)
+
+To redeploy or execute against MST Testnet:
+```bash
+python scripts/deploy_mst_testnet.py
+```
+
+### 4. Launch Application
 To launch the FastAPI backend and clinical interface:
+
 ```bash
 python app.py
 ```

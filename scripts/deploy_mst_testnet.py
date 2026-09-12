@@ -7,11 +7,15 @@ import os
 import sys
 import json
 from pathlib import Path
+from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 
 ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / ".env")
+
 ARTIFACT_PATH = ROOT_DIR / "blockchain" / "artifacts" / "contracts" / "PatientRecords.sol" / "PatientRecords.json"
+
 DEPLOYMENTS_PATH = ROOT_DIR / "blockchain" / "deployments.json"
 
 RPC_URL = os.environ.get("MST_TESTNET_RPC_URL", "https://testnetrpc.mstblockchain.com")
@@ -92,8 +96,10 @@ def deploy():
         construct_txn["gas"] = 3000000
 
     signed_txn = account.sign_transaction(construct_txn)
-    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+    tx_raw = getattr(signed_txn, "raw_transaction", None) or getattr(signed_txn, "rawTransaction", None)
+    tx_hash = w3.eth.send_raw_transaction(tx_raw)
     print(f"Transaction Hash: {tx_hash.hex()}")
+
     print("Waiting for transaction confirmation...")
 
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
