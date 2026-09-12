@@ -76,4 +76,6 @@ backend/static/reports/*.pdf
 kaggle.json
 .kaggle_staging/
 models/kaggle_output/
-data/chest_xray/
+# Runtime generated records & audits
+data/records_db/
+data/feedback_audit_log.jsonl

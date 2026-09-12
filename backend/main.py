@@ -13,6 +13,7 @@ from backend.routes.analyze import router as analyze_router
 from backend.routes.report import router as report_router
 from backend.routes.compare import router as compare_router
 from backend.routes.feedback import router as feedback_router
+from backend.routes.blockchain import router as blockchain_router
 
 app = FastAPI(
     title="PneumoVision API",
@@ -43,6 +44,8 @@ app.include_router(analyze_router)
 app.include_router(report_router)
 app.include_router(compare_router)
 app.include_router(feedback_router)
+app.include_router(blockchain_router)
+
 
 # Mount frontend build directory if present at root
 frontend_dist = BASE_DIR / "frontend" / "dist"
