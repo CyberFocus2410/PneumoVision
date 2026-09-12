@@ -79,3 +79,6 @@ models/kaggle_output/
 # Runtime generated database & audit logs
 data/records_db/
 data/feedback_audit_log.jsonl
+*.db
+data/*.db
+

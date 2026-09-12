@@ -1,18 +1,18 @@
 """
 Blockchain Consent & Medical Records Care Timeline Access Routes.
 Provides endpoints for:
-- POST /v1/consent/grant : Grant medical access to a doctor/hospital
-- POST /v1/consent/revoke : Revoke medical access
-- POST /v1/records/{patient_id}/treatment : Commit hash-verified treatment record
-- POST /v1/records/{patient_id}/medication : Commit hash-verified medication record
-- POST /v1/records/{patient_id}/outcome : Commit hash-verified outcome/reaction record
+- POST /v1/consent/grant : Grant medical access to a doctor/hospital (guarded: require_patient)
+- POST /v1/consent/revoke : Revoke medical access (guarded: require_patient)
+- POST /v1/records/{patient_id}/treatment : Commit hash-verified treatment record (guarded: require_doctor)
+- POST /v1/records/{patient_id}/medication : Commit hash-verified medication record (guarded: require_doctor)
+- POST /v1/records/{patient_id}/outcome : Commit hash-verified outcome/reaction record (guarded: require_doctor)
 - GET /v1/records/{patient_id} : Full chronological, hash-verified history across all record types
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, Body, status
+from fastapi import APIRouter, HTTPException, Query, Body, Depends, status
 from pydantic import BaseModel, Field
 
 from backend.blockchain.client import get_blockchain_client, to_hex_bytes32
@@ -22,6 +22,8 @@ from backend.blockchain.store import (
     save_offchain_record,
     compute_content_hash,
 )
+from backend.auth.deps import require_patient, require_doctor, get_current_user
+from backend.db.models import User, UserRole
 
 router = APIRouter(tags=["Blockchain & Care Timeline"])
 
@@ -29,7 +31,7 @@ router = APIRouter(tags=["Blockchain & Care Timeline"])
 class ConsentRequest(BaseModel):
     patient_id: str = Field(..., description="Pseudonymous patient identifier")
     provider_address: str = Field(..., description="Ethereum address of hospital or doctor")
-    caller_address: Optional[str] = Field(None, description="Wallet address of the patient (defaults to registered owner)")
+    caller_address: Optional[str] = Field(None, description="Wallet address of the patient (defaults to authenticated patient)")
 
 
 class TreatmentRecordRequest(BaseModel):
@@ -63,17 +65,32 @@ class OutcomeRecordRequest(BaseModel):
 
 @router.post("/consent/grant")
 @router.post("/v1/consent/grant")
-async def grant_consent(payload: ConsentRequest):
+async def grant_consent(
+    payload: ConsentRequest,
+    current_patient: User = Depends(require_patient)
+):
     """
     Grants record viewing consent to a designated healthcare provider or hospital address.
-    Callable only by the patient's registered wallet.
+    Callable only by the authenticated patient matching patient_id.
     """
+    # Verify patient ownership (unless admin)
+    if current_patient.role == UserRole.PATIENT.value and current_patient.patient_id:
+        req_hash = to_hex_bytes32(payload.patient_id).lower()
+        user_hash = to_hex_bytes32(current_patient.patient_id).lower()
+        if req_hash != user_hash:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: Patients may only grant consent for their own medical identity."
+            )
+
+    caller_wallet = payload.caller_address or current_patient.wallet_address
+
     try:
         client = get_blockchain_client()
         result = client.grant_access(
             patient_id=payload.patient_id,
             hospital_or_doctor=payload.provider_address,
-            patient_address=payload.caller_address
+            patient_address=caller_wallet
         )
         return {
             "status": "success",
@@ -91,17 +108,31 @@ async def grant_consent(payload: ConsentRequest):
 
 @router.post("/consent/revoke")
 @router.post("/v1/consent/revoke")
-async def revoke_consent(payload: ConsentRequest):
+async def revoke_consent(
+    payload: ConsentRequest,
+    current_patient: User = Depends(require_patient)
+):
     """
     Revokes record viewing consent from a healthcare provider or hospital address.
-    Callable only by the patient's registered wallet.
+    Callable only by the authenticated patient matching patient_id.
     """
+    if current_patient.role == UserRole.PATIENT.value and current_patient.patient_id:
+        req_hash = to_hex_bytes32(payload.patient_id).lower()
+        user_hash = to_hex_bytes32(current_patient.patient_id).lower()
+        if req_hash != user_hash:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: Patients may only revoke consent for their own medical identity."
+            )
+
+    caller_wallet = payload.caller_address or current_patient.wallet_address
+
     try:
         client = get_blockchain_client()
         result = client.revoke_access(
             patient_id=payload.patient_id,
             hospital_or_doctor=payload.provider_address,
-            patient_address=payload.caller_address
+            patient_address=caller_wallet
         )
         return {
             "status": "success",
@@ -121,15 +152,18 @@ async def revoke_consent(payload: ConsentRequest):
 @router.post("/v1/records/{patient_id}/treatment")
 async def add_treatment_record(
     patient_id: str,
-    payload: TreatmentRecordRequest
+    payload: TreatmentRecordRequest,
+    current_doctor: User = Depends(require_doctor)
 ):
     """
     Commits a hash-verified Treatment record linked to a prior Diagnosis.
+    Guarded: requires an authenticated, verified physician.
     """
     try:
         client = get_blockchain_client()
         treatment_id = f"treatment_{uuid.uuid4().hex[:8]}"
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        author_wallet = payload.provider_address or current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -139,6 +173,8 @@ async def add_treatment_record(
             "treatment_description": payload.treatment_description,
             "treatment_type": payload.treatment_type,
             "diagnosis_ref": payload.diagnosis_ref,
+            "author_doctor_name": current_doctor.full_name,
+            "author_doctor_id": current_doctor.id,
             "notes": payload.notes,
             "timestamp": timestamp,
             "schema_version": "1.0"
@@ -154,7 +190,7 @@ async def add_treatment_record(
             record_type="Treatment",
             content_hash=content_hash,
             off_chain_ref=off_chain_ref,
-            provider_address=payload.provider_address
+            provider_address=author_wallet
         )
 
         return {
@@ -169,6 +205,11 @@ async def add_treatment_record(
             "off_chain_ref": off_chain_ref,
             "details": record_payload
         }
+    except PermissionError as pe:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(pe)
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -180,15 +221,18 @@ async def add_treatment_record(
 @router.post("/v1/records/{patient_id}/medication")
 async def add_medication_record(
     patient_id: str,
-    payload: MedicationRecordRequest
+    payload: MedicationRecordRequest,
+    current_doctor: User = Depends(require_doctor)
 ):
     """
     Commits a hash-verified Medication record linked to Diagnosis and Treatment.
+    Guarded: requires an authenticated, verified physician.
     """
     try:
         client = get_blockchain_client()
         medication_id = f"med_{uuid.uuid4().hex[:8]}"
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        author_wallet = payload.provider_address or current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -202,6 +246,8 @@ async def add_medication_record(
             "diagnosis_ref": payload.diagnosis_ref,
             "treatment_ref": payload.treatment_ref,
             "instructions": payload.instructions,
+            "author_doctor_name": current_doctor.full_name,
+            "author_doctor_id": current_doctor.id,
             "timestamp": timestamp,
             "schema_version": "1.0"
         }
@@ -216,7 +262,7 @@ async def add_medication_record(
             record_type="Medication",
             content_hash=content_hash,
             off_chain_ref=off_chain_ref,
-            provider_address=payload.provider_address
+            provider_address=author_wallet
         )
 
         return {
@@ -232,6 +278,11 @@ async def add_medication_record(
             "off_chain_ref": off_chain_ref,
             "details": record_payload
         }
+    except PermissionError as pe:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(pe)
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -243,15 +294,18 @@ async def add_medication_record(
 @router.post("/v1/records/{patient_id}/outcome")
 async def add_outcome_record(
     patient_id: str,
-    payload: OutcomeRecordRequest
+    payload: OutcomeRecordRequest,
+    current_doctor: User = Depends(require_doctor)
 ):
     """
     Commits a hash-verified Outcome/Reaction record linked to Treatment and Medication.
+    Guarded: requires an authenticated, verified physician.
     """
     try:
         client = get_blockchain_client()
         outcome_id = f"outcome_{uuid.uuid4().hex[:8]}"
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        author_wallet = payload.provider_address or current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -263,6 +317,8 @@ async def add_outcome_record(
             "treatment_ref": payload.treatment_ref,
             "medication_ref": payload.medication_ref,
             "patient_status": payload.patient_status,
+            "author_doctor_name": current_doctor.full_name,
+            "author_doctor_id": current_doctor.id,
             "notes": payload.notes,
             "timestamp": timestamp,
             "schema_version": "1.0"
@@ -278,7 +334,7 @@ async def add_outcome_record(
             record_type="Outcome",
             content_hash=content_hash,
             off_chain_ref=off_chain_ref,
-            provider_address=payload.provider_address
+            provider_address=author_wallet
         )
 
         return {
@@ -294,6 +350,11 @@ async def add_outcome_record(
             "off_chain_ref": off_chain_ref,
             "details": record_payload
         }
+    except PermissionError as pe:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(pe)
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -310,7 +371,7 @@ async def get_patient_records(
     """
     Retrieves full chronological, hash-verified care timeline across all record types
     (Diagnosis -> Treatment -> Medication -> Outcome) with lineage links and tamper warnings.
-    Reverts with 403 Forbidden if caller has not been granted consent.
+    Reverts with 403 Forbidden if caller has not been granted consent on-chain.
     """
     try:
         client = get_blockchain_client()
@@ -387,4 +448,3 @@ async def get_patient_records(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve records: {error_msg}"
         )
-

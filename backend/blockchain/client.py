@@ -208,8 +208,15 @@ class PatientRecordsClient:
             self.register_patient(patient_id, patient_address=self.default_patient)
 
         # Ensure sender is authorized provider
-        if not self.contract.functions.authorizedProviders(sender).call():
-            self.authorize_provider(sender, "Authorized Healthcare Provider")
+        is_authorized = bool(self.contract.functions.authorizedProviders(sender).call())
+        if not is_authorized:
+            local_dev_mode = os.environ.get("LOCAL_DEV_MODE", "false").lower() in ("true", "1", "yes")
+            if local_dev_mode:
+                self.authorize_provider(sender, "Authorized Healthcare Provider (Dev Mode)")
+            else:
+                raise PermissionError(
+                    f"UnauthorizedProvider: Address {sender} is not an authorized healthcare provider on-chain."
+                )
 
         tx_hash = self.contract.functions.addRecord(
             p_bytes,

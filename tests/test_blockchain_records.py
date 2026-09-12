@@ -8,6 +8,7 @@ Verifies:
 5. Tamper detection: altered off-chain payload generates cryptographic mismatch alert.
 """
 
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
@@ -75,11 +76,20 @@ def test_unauthorized_reader_rejected():
 def test_consent_grant_and_revoke_workflow():
     """Verifies granting and revoking access dynamically updates read permissions."""
     bc_client = get_blockchain_client()
-    patient_id = "PATIENT_CONSENT_LIFECYCLE_02"
+    uid = uuid.uuid4().hex[:6]
+    patient_id = f"PATIENT_CONSENT_LIFECYCLE_{uid}"
     hospital_address = bc_client.accounts[4] if len(bc_client.accounts) > 4 else "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
 
-    # 1. Analyze case
+    # Signup patient
+    pat_res = client.post("/v1/auth/patient/signup", json={
+        "email": f"lifecycle_patient_{uid}@example.com",
+        "password": "Password123!",
+        "full_name": "Lifecycle Patient",
+        "patient_id": patient_id
+    })
+    pat_token = pat_res.json()["access_token"]
 
+    # 1. Analyze case
     client.post(
         "/v1/analyze",
         data={"sample_id": "sample_pneumonia", "patient_id": patient_id}
@@ -92,6 +102,7 @@ def test_consent_grant_and_revoke_workflow():
     # 3. Patient grants consent
     grant_res = client.post(
         "/v1/consent/grant",
+        headers={"Authorization": f"Bearer {pat_token}"},
         json={"patient_id": patient_id, "provider_address": hospital_address}
     )
     assert grant_res.status_code == 200
@@ -107,6 +118,7 @@ def test_consent_grant_and_revoke_workflow():
     # 5. Patient revokes consent
     revoke_res = client.post(
         "/v1/consent/revoke",
+        headers={"Authorization": f"Bearer {pat_token}"},
         json={"patient_id": patient_id, "provider_address": hospital_address}
     )
     assert revoke_res.status_code == 200
@@ -162,7 +174,39 @@ def test_full_care_timeline_sequence():
     3. Off-chain database payloads match on-chain cryptographic digests.
     4. Lineage linking (Diagnosis -> Treatment/Medication -> Outcome) is preserved.
     """
-    patient_id = "PATIENT_FULL_CARE_TIMELINE_04"
+    uid = uuid.uuid4().hex[:6]
+    patient_id = f"PATIENT_FULL_CARE_TIMELINE_{uid}"
+    bc_client = get_blockchain_client()
+
+    # Signup verified doctor for creating care records
+    doc_wallet = bc_client.accounts[3] if len(bc_client.accounts) > 3 else bc_client.admin_account
+    doc_res = client.post("/v1/auth/doctor/signup", json={
+        "email": f"care_doc_{uid}@pneumovision.ai",
+        "password": "DocPassword123!",
+        "full_name": "Dr. Timeline Specialist",
+        "wallet_address": doc_wallet,
+        "medical_license": f"MD-CARE-{uid.upper()}"
+    })
+    doc_id = doc_res.json()["user"]["id"]
+
+    # Admin authorizes doctor
+    admin_login = client.post("/v1/auth/doctor/login", json={
+        "email": "admin@pneumovision.ai",
+        "password": "AdminPassword2026!"
+    })
+    admin_token = admin_login.json()["access_token"]
+    client.post(
+        "/v1/admin/providers/authorize",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"doctor_id": doc_id}
+    )
+
+    # Doctor logs in to receive verified token
+    doc_login = client.post("/v1/auth/doctor/login", json={
+        "email": f"care_doc_{uid}@pneumovision.ai",
+        "password": "DocPassword123!"
+    })
+    doc_token = doc_login.json()["access_token"]
 
     # Step 1: Diagnosis (via /analyze)
     diag_res = client.post(
@@ -178,6 +222,7 @@ def test_full_care_timeline_sequence():
     # Step 2: Treatment (linked to Diagnosis)
     treat_res = client.post(
         f"/v1/records/{patient_id}/treatment",
+        headers={"Authorization": f"Bearer {doc_token}"},
         json={
             "treatment_description": "Empiric Broad-Spectrum Antibiotic Therapy & Supplemental O2",
             "diagnosis_ref": diag_ref,
@@ -196,6 +241,7 @@ def test_full_care_timeline_sequence():
     # Step 3: Medication (linked to Diagnosis and Treatment)
     med_res = client.post(
         f"/v1/records/{patient_id}/medication",
+        headers={"Authorization": f"Bearer {doc_token}"},
         json={
             "medicine_name": "Azithromycin + Ceftriaxone",
             "dosage": "500mg IV daily",
@@ -218,6 +264,7 @@ def test_full_care_timeline_sequence():
     # Step 4: Outcome / Reaction (linked to Treatment and Medication)
     out_res = client.post(
         f"/v1/records/{patient_id}/outcome",
+        headers={"Authorization": f"Bearer {doc_token}"},
         json={
             "outcome_description": "Marked clinical improvement, fever subsiding, bilateral lung fields clearing.",
             "time_to_response": "72 hours",
