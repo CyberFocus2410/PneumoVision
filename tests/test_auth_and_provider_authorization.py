@@ -391,6 +391,14 @@ def test_full_chain_security_and_consent_enforcement_with_local_dev_mode_off(cli
     assert unauthorized_read.status_code == 403
     assert "Access Denied" in unauthorized_read.json()["detail"]
 
+    # Doctor attempts to bypass by passing a forged caller_address query param -> still blocked!
+    forged_read = client.get(
+        f"/v1/records/{pat1_id}?caller_address={bc_client.admin_account}",
+        headers={"Authorization": f"Bearer {approved_doc_token}"}
+    )
+    assert forged_read.status_code == 403
+    assert "Access Denied" in forged_read.json()["detail"]
+
     # 3. Patient 1 grants consent on-chain to this doctor
     grant_res = client.post(
         "/v1/consent/grant",
@@ -440,6 +448,14 @@ def test_full_chain_security_and_consent_enforcement_with_local_dev_mode_off(cli
     assert my_records_res.status_code == 200
     assert my_records_res.json()["patient_id"] == pat1_id
 
+    # Patient 1 reads own record via /v1/records/{pat1_id} -> succeeds
+    direct_own_read = client.get(
+        f"/v1/records/{pat1_id}",
+        headers={"Authorization": f"Bearer {pat1_token}"}
+    )
+    assert direct_own_read.status_code == 200
+    assert direct_own_read.json()["patient_id"] == pat1_id
+
     # Patient 1 attempts to read Patient 2's records via /v1/records/{pat2_id} -> blocked
     cross_patient_read = client.get(
         f"/v1/records/{pat2_id}",
@@ -447,5 +463,6 @@ def test_full_chain_security_and_consent_enforcement_with_local_dev_mode_off(cli
     )
     assert cross_patient_read.status_code == 403
     assert "restricted to reading their own patient records" in cross_patient_read.json()["detail"]
+
 
 

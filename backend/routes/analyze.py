@@ -5,7 +5,7 @@ runs inference, stores off-chain clinical report payload, and commits cryptograp
 """
 
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status
 from typing import Optional, Dict, Any
 from pathlib import Path
 import io
@@ -14,6 +14,11 @@ from src.inference.engine import PneumoInferenceEngine
 from src.config import SAMPLES_DIR
 from backend.blockchain.client import get_blockchain_client
 from backend.blockchain.store import compute_content_hash, save_offchain_record
+from backend.db.models import User, UserRole
+from backend.auth.deps import get_optional_current_user
+
+
+
 
 router = APIRouter(prefix="/v1", tags=["Analysis"])
 
@@ -32,12 +37,24 @@ async def analyze_xray(
     sample_id: Optional[str] = Form(None),
     patient_id: Optional[str] = Form(None),
     use_tta: bool = Form(True),
-    use_mc_dropout: bool = Form(True)
+    use_mc_dropout: bool = Form(True),
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """
     Accepts an uploaded X-ray or sample ID, executes AI inference, stores full diagnosis detail off-chain,
     and commits a tamper-evident cryptographic hash on-chain via PatientRecords.sol (RecordType.Diagnosis).
     """
+    # If authenticated doctor, ensure verified status and resolve provider wallet
+    doctor_wallet: Optional[str] = None
+    if current_user and isinstance(current_user, User):
+        if current_user.role == UserRole.DOCTOR.value:
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Doctor account is pending administrative verification."
+                )
+            doctor_wallet = current_user.wallet_address
+
     engine = get_engine()
 
     # Prioritize uploaded file if provided and non-empty
@@ -90,6 +107,9 @@ async def analyze_xray(
             "model_version": results["model_version"],
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
+        if current_user and isinstance(current_user, User):
+            diagnosis_payload["author_doctor_name"] = current_user.full_name
+            diagnosis_payload["author_doctor_id"] = current_user.id
 
         save_offchain_record(off_chain_ref, diagnosis_payload)
         content_hash = compute_content_hash(diagnosis_payload)
@@ -101,7 +121,8 @@ async def analyze_xray(
                 patient_id=pid,
                 record_type="Diagnosis",
                 content_hash=content_hash,
-                off_chain_ref=off_chain_ref
+                off_chain_ref=off_chain_ref,
+                provider_address=doctor_wallet
             )
             results["patient_id"] = pid
             results["blockchain_tx_hash"] = bc_receipt.get("tx_hash")
@@ -109,6 +130,11 @@ async def analyze_xray(
             results["content_hash"] = content_hash
             results["off_chain_ref"] = off_chain_ref
             results["blockchain_status"] = "COMMITTED"
+        except PermissionError as pe:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(pe)
+            )
         except Exception as bc_err:
             print(f"Warning: Blockchain on-chain commit failed: {bc_err}")
             results["patient_id"] = pid
@@ -117,7 +143,10 @@ async def analyze_xray(
             results["blockchain_status"] = f"ERROR: {str(bc_err)}"
 
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Inference analysis failed: {str(e)}")
+

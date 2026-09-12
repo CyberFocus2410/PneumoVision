@@ -157,13 +157,18 @@ async def add_treatment_record(
 ):
     """
     Commits a hash-verified Treatment record linked to a prior Diagnosis.
-    Guarded: requires an authenticated, verified physician.
+    Guarded: requires an authenticated, verified physician using their own registered wallet address.
     """
     try:
+        if not current_doctor.wallet_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Doctor does not have a registered blockchain wallet address."
+            )
         client = get_blockchain_client()
         treatment_id = f"treatment_{uuid.uuid4().hex[:8]}"
         timestamp = datetime.now(timezone.utc).isoformat()
-        author_wallet = payload.provider_address or current_doctor.wallet_address
+        author_wallet = current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -210,6 +215,8 @@ async def add_treatment_record(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(pe)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -226,13 +233,18 @@ async def add_medication_record(
 ):
     """
     Commits a hash-verified Medication record linked to Diagnosis and Treatment.
-    Guarded: requires an authenticated, verified physician.
+    Guarded: requires an authenticated, verified physician using their own registered wallet address.
     """
     try:
+        if not current_doctor.wallet_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Doctor does not have a registered blockchain wallet address."
+            )
         client = get_blockchain_client()
         medication_id = f"med_{uuid.uuid4().hex[:8]}"
         timestamp = datetime.now(timezone.utc).isoformat()
-        author_wallet = payload.provider_address or current_doctor.wallet_address
+        author_wallet = current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -283,6 +295,8 @@ async def add_medication_record(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(pe)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -299,13 +313,18 @@ async def add_outcome_record(
 ):
     """
     Commits a hash-verified Outcome/Reaction record linked to Treatment and Medication.
-    Guarded: requires an authenticated, verified physician.
+    Guarded: requires an authenticated, verified physician using their own registered wallet address.
     """
     try:
+        if not current_doctor.wallet_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Doctor does not have a registered blockchain wallet address."
+            )
         client = get_blockchain_client()
         outcome_id = f"outcome_{uuid.uuid4().hex[:8]}"
         timestamp = datetime.now(timezone.utc).isoformat()
-        author_wallet = payload.provider_address or current_doctor.wallet_address
+        author_wallet = current_doctor.wallet_address
 
         # Structured off-chain payload with lineage linking
         record_payload = {
@@ -355,6 +374,8 @@ async def add_outcome_record(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(pe)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -371,22 +392,36 @@ async def _fetch_patient_records_internal(
         client = get_blockchain_client()
 
         # Enforce patient self-read isolation: patients cannot read other patients' records
-        if current_user and isinstance(current_user, User) and current_user.role == UserRole.PATIENT.value and current_user.patient_id:
-            req_hash = to_hex_bytes32(patient_id).lower()
-            user_hash = to_hex_bytes32(current_user.patient_id).lower()
-            if req_hash != user_hash:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access Denied: Patients are strictly restricted to reading their own patient records."
-                )
-
         if current_user and isinstance(current_user, User):
-            resolved_caller = caller_address or current_user.wallet_address or (client.default_patient if current_user.role == UserRole.PATIENT.value else client.admin_account)
+            if current_user.role == UserRole.PATIENT.value:
+                # Patient role caller: strictly enforce server-derived patient_id
+                req_hash = to_hex_bytes32(patient_id).lower()
+                user_hash = to_hex_bytes32(current_user.patient_id).lower() if current_user.patient_id else ""
+                if not current_user.patient_id or req_hash != user_hash:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access Denied: Patients are strictly restricted to reading their own patient records."
+                    )
+                patient_id = current_user.patient_id
+                resolved_caller = current_user.wallet_address or client.default_patient
+            elif current_user.role == UserRole.DOCTOR.value:
+                # Doctor role caller: strictly use doctor's registered wallet address to check on-chain consent
+                if not current_user.wallet_address:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Doctor does not have a registered blockchain wallet address."
+                    )
+                resolved_caller = current_user.wallet_address
+            elif current_user.role == UserRole.ADMIN.value:
+                resolved_caller = current_user.wallet_address or client.admin_account
+            else:
+                resolved_caller = current_user.wallet_address or client.default_patient
         else:
             resolved_caller = caller_address or client.default_patient
 
         # 1. Fetch on-chain record list (reverts on-chain if unauthorized)
         onchain_records = client.get_records(patient_id=patient_id, caller_address=resolved_caller)
+
 
         # 2. Verify cryptographic hash of each off-chain record
         verified_records = []
