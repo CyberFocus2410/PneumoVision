@@ -1,129 +1,163 @@
 """
-Dual-Mode Clinical & Patient-Friendly Radiology Report Generator for PneumoVision.
-Generates both plain-language patient summaries (accessible to the general public)
-and formal structured radiological impressions for physicians.
+PneumoVision Clinical & Patient-Friendly Radiology Reporting Module.
+
+Generates structured decision-support reports containing:
+- Findings: Generic objective radiographic observations.
+- AI Assessment: Suggested pathology pattern(s) (e.g. Pneumonia) without stating a diagnosis as fact.
+- Calibrated Confidence: Temperature-calibrated probabilities, operating cutoffs, and uncertainty intervals.
+- Recommendation: Clinical / radiologist review recommendation (never definitive medical assertions).
+
+Supports both binary screening mode (Pneumonia vs No Finding) and multi-label mode based on central config.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+from src.config import (
+    TARGET_CLASSES,
+    DEFAULT_THRESHOLDS,
+    LABEL_MODE,
+    get_target_classes,
+    get_default_thresholds,
+)
+
 STANDARD_DISCLAIMER = (
-    "NOTICE: This is an AI-assisted research and decision-support tool. It does not constitute a "
-    "medical diagnosis or formal clinical interpretation. All findings, probabilities, and heatmaps "
-    "must be reviewed and confirmed by a qualified radiologist or physician before clinical action."
+    "NOTICE & REGULATORY DISCLAIMER: PneumoVision is an artificial intelligence-assisted "
+    "screening research prototype and clinical decision-support tool. It does NOT provide a definitive medical "
+    "diagnosis or replace physician judgment. All model observations, calibrated confidence scores, and Grad-CAM++ "
+    "visualizations must be formally reviewed and confirmed by a licensed radiologist or healthcare provider."
 )
 
 PLAIN_GLOSSARY = {
-    "Pneumonia": "An infection that causes the air sacs in one or both lungs to fill with fluid or pus, often causing cough, fever, and breathing difficulty.",
-    "Cardiomegaly": "The silhouette of the heart appears enlarged on the X-ray image, which can occur with high blood pressure, valve issues, or heart strain.",
-    "Pleural Effusion": "An abnormal buildup of fluid in the space between the outer lung surface and the chest wall.",
-    "Atelectasis": "A temporary collapse or partial deflation of a small area of lung tissue, very common after anesthesia, bed rest, or shallow breathing.",
-    "Consolidation": "A region of lung tissue that has become firm and dense because air has been replaced by fluid or inflammatory cells.",
-    "Grad-CAM": "A visual explanation tool that highlights the specific areas of the X-ray the AI examined to reach its conclusion."
+    "Pneumonia": "An inflammatory condition or infection causing fluid or cellular buildup in lung air sacs, often associated with cough, fever, or difficulty breathing.",
+    "No Finding": "No overt focal consolidation, effusion, or gross radiopaque abnormality detected on the evaluated frontal view above screening thresholds.",
+    "Cardiomegaly": "Enlargement of the cardiac silhouette shadow beyond standard cardiothoracic ratio limits.",
+    "Pleural Effusion": "Fluid accumulation within the pleural space between the parietal and visceral pleura.",
+    "Atelectasis": "Subsegmental volume loss or collapse of pulmonary parenchyma.",
+    "Consolidation": "Replacement of normal alveolar air by fluid, exudate, or inflammatory debris producing increased radiographic opacity.",
+    "Grad-CAM": "Gradient-weighted Class Activation Mapping highlighting regions contributing to the neural network's visual attention."
 }
 
-def generate_plain_patient_summary(primary_finding: str, predictions: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Translates complex radiological findings into compassionate, crystal-clear plain English.
-    """
-    positives = [p for p in predictions if p["positive"] and p["label"] != "No Finding"]
 
-    if not positives or primary_finding == "No Finding":
-        headline = "Your Chest X-Ray Looks Clear and Normal"
-        explanation = (
-            "The AI screening system did not detect any significant signs of pneumonia, fluid buildup, "
-            "or heart enlargement. Your lungs appear clear and well-expanded."
+def generate_plain_patient_summary(
+    primary_finding: str,
+    predictions: List[Dict[str, Any]],
+    target_classes: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Constructs a clear, non-definitive, patient-accessible summary explaining AI screening observations
+    without delivering diagnoses as absolute facts.
+    """
+    target_classes = target_classes or get_target_classes()
+    positives = [p for p in predictions if p.get("positive", False) and p["label"] not in ("No Finding", "No_Finding", "Normal")]
+    
+    primary_pred = next((p for p in predictions if p["label"] == primary_finding), None)
+    prob_pct = f"{primary_pred['probability_percent']}%" if primary_pred else "N/A"
+    conf_band = primary_pred.get("confidence_band", "MODERATE_CONFIDENCE").replace("_", " ").title() if primary_pred else "Calibrated"
+
+    if not positives or primary_finding in ("No Finding", "No_Finding", "Normal"):
+        headline = "No Acute Radiographic Findings Suggested by AI Screener"
+        findings_desc = (
+            "The visual screening algorithm evaluated the lung fields and thoracic silhouette. "
+            "No focal pulmonary airspace opacities, large consolidations, or gross fluid accumulations were detected "
+            "above the calibrated screening threshold."
+        )
+        ai_assessment = (
+            "AI Assessment: No acute cardiopulmonary abnormalities suggested on this single radiograph. "
+            "Note: This screening assessment does NOT constitute a clean bill of health or guarantee absence of early, "
+            "subtle, or non-radiopaque respiratory conditions."
+        )
+        confidence_text = (
+            f"Calibrated Negative Probability: {prob_pct} (Confidence Tier: {conf_band})."
+        )
+        recommendation_text = (
+            "Clinical review recommended. If you are experiencing respiratory symptoms such as cough, fever, chest pain, "
+            "or shortness of breath, please consult your physician or healthcare team for formal examination."
         )
         what_to_do = [
-            "Discuss these reassuring results with your doctor alongside how you are currently feeling.",
-            "If you still have cough, shortness of breath, or fever, follow your doctor's guidance for further evaluation."
+            "Share these screening observations with your treating physician for medical context.",
+            "Discuss ongoing symptoms (e.g., fever, cough, fatigue) even if this screening radiograph shows no acute findings.",
+            "Seek prompt emergency medical care if you experience severe breathlessness, chest tightness, or dizziness."
         ]
         questions_for_doctor = [
-            "Does this normal X-ray match my clinical symptoms?",
-            "Are there any other tests needed if my symptoms persist?"
+            "Do these initial screening observations correlate with my clinical symptoms?",
+            "Are further diagnostic tests, auscultation, or lab work indicated?"
         ]
     elif primary_finding == "Pneumonia":
-        headline = "Possible Signs of a Lung Infection (Pneumonia)"
-        explanation = (
-            "The AI model identified an area of increased density (often called 'consolidation') in the lung field. "
-            "In plain words, a section of the lung appears to have fluid or inflammation, which is common in bacterial or viral pneumonia."
+        headline = "Pattern Suggestive of Pulmonary Infiltrate / Pneumonia Flagged for Review"
+        findings_desc = (
+            "An area of increased radiographic density (pulmonary opacity / possible airspace consolidation) was observed "
+            "within the lung field on the radiograph."
+        )
+        ai_assessment = (
+            "AI Assessment: Image patterns are suggestive of Pneumonia (inflammatory consolidation). "
+            "This is an automated pattern-recognition observation, NOT a definitive diagnosis. Clinical confirmation is required."
+        )
+        confidence_text = (
+            f"Calibrated Confidence: {prob_pct} (Confidence Tier: {conf_band})."
+        )
+        recommendation_text = (
+            "Clinical / radiologist review strongly recommended. A licensed physician must evaluate this radiograph in conjunction "
+            "with patient history, physical examination (lung sounds), and vital signs to determine if targeted therapy (e.g. antibiotics) is warranted."
         )
         what_to_do = [
-            "Contact your healthcare provider promptly to confirm if antibiotic or antiviral treatment is needed.",
-            "Rest, stay well hydrated, and monitor your temperature and breathing.",
-            "Seek immediate medical attention if you experience severe shortness of breath, blue lips, or confusion."
+            "Contact your healthcare provider promptly for formal clinical interpretation and physical exam.",
+            "Monitor your vital signs, oxygen saturation, and body temperature closely.",
+            "Seek immediate urgent care if you experience severe shortness of breath, confusion, or persistent high fever."
         ]
         questions_for_doctor = [
-            "Is antibiotic medication appropriate for this infection?",
-            "Should I schedule a follow-up chest X-ray in a few weeks to ensure the lung has fully cleared?"
-        ]
-    elif primary_finding == "Cardiomegaly":
-        headline = "Enlarged Heart Silhouette (Cardiomegaly)"
-        explanation = (
-            "The shadow of your heart on this X-ray appears broader than normal. This is not a diagnosis of heart failure on its own, "
-            "but it suggests your heart may be working harder or carrying extra fluid."
-        )
-        what_to_do = [
-            "Schedule a follow-up visit with your physician or cardiologist.",
-            "Monitor your blood pressure and watch for symptoms like swelling in the ankles or shortness of breath when lying flat."
-        ]
-        questions_for_doctor = [
-            "Would an echocardiogram (ultrasound of the heart) be helpful to check my heart muscle function?",
-            "Do I need any adjustments to my blood pressure or fluid medications?"
-        ]
-    elif primary_finding == "Pleural Effusion":
-        headline = "Fluid Layer Around the Lung (Pleural Effusion)"
-        explanation = (
-            "The AI noticed a blunting or smoothing at the base of the lung, indicating a small layer of fluid has gathered around the lung. "
-            "This can cause a sharp sensation when taking a deep breath."
-        )
-        what_to_do = [
-            "Share these findings with your doctor to determine what is causing the fluid accumulation.",
-            "Avoid intense physical exertion until your physician evaluates the extent of fluid."
-        ]
-        questions_for_doctor = [
-            "What underlying condition is causing the fluid to build up?",
-            "Is any treatment or drainage needed, or will medication resolve it?"
-        ]
-    elif primary_finding == "Atelectasis":
-        headline = "Small Deflated Lung Section (Atelectasis)"
-        explanation = (
-            "The scan shows a small band at the bottom of the lung that is temporarily not fully expanded. "
-            "This is very common after surgery, pain, or shallow breathing, and is usually reversible."
-        )
-        what_to_do = [
-            "Practice regular deep breathing exercises (or use an incentive spirometer if provided after surgery).",
-            "Stay mobile and take gentle walks as advised by your healthcare team."
-        ]
-        questions_for_doctor = [
-            "Are breathing exercises sufficient to re-expand this area?",
-            "When should I expect this to resolve?"
+            "Does the observed lung density correlate with my physical exam and symptoms?",
+            "Is prescription antimicrobial medication or supportive respiratory care recommended?",
+            "Will a follow-up chest radiograph be required to verify resolution?"
         ]
     else:
-        headline = f"Potential Finding Identified: {primary_finding}"
-        explanation = f"The AI analysis flagged findings related to {primary_finding} for professional review."
-        what_to_do = ["Consult your treating physician for formal correlation."]
-        questions_for_doctor = ["How does this finding relate to my symptoms?"]
+        headline = f"Pattern Suggestive of {primary_finding} Flagged for Review"
+        findings_desc = (
+            f"Radiographic features consistent with possible {primary_finding} were identified on the image."
+        )
+        ai_assessment = (
+            f"AI Assessment: Visual features suggestive of {primary_finding}. "
+            "This is a probabilistic model suggestion and not a clinical diagnosis."
+        )
+        confidence_text = f"Calibrated Confidence: {prob_pct} ({conf_band})."
+        recommendation_text = (
+            "Clinical / radiologist review recommended to correlate image features with patient examination."
+        )
+        what_to_do = [
+            "Consult your medical provider for formal clinical correlation and next steps.",
+            "Follow prescribed physician guidance for management."
+        ]
+        questions_for_doctor = [
+            f"How does this finding of suspected {primary_finding} align with my clinical presentation?",
+            "What further diagnostic evaluations or treatment adjustments are recommended?"
+        ]
 
-    # Select relevant glossary terms
+    # Relevant glossary
     relevant_terms = {}
-    for term in [primary_finding, "Grad-CAM", "Consolidation"]:
+    for term in [primary_finding, "Consolidation", "Grad-CAM", "No Finding"]:
         if term in PLAIN_GLOSSARY:
             relevant_terms[term] = PLAIN_GLOSSARY[term]
 
     return {
         "headline": headline,
-        "explanation": explanation,
+        "findings_description": findings_desc,
+        "ai_assessment": ai_assessment,
+        "calibrated_confidence": confidence_text,
+        "clinical_recommendation": recommendation_text,
+        "explanation": f"{findings_desc} {ai_assessment}",
         "what_to_do_next": what_to_do,
         "questions_for_doctor": questions_for_doctor,
-        "glossary": relevant_terms
+        "glossary": relevant_terms,
     }
 
 
-def generate_structured_report(analysis_result: Dict[str, Any], clinician_notes: str = "") -> Dict[str, Any]:
+def generate_structured_report(
+    analysis_result: Dict[str, Any],
+    clinician_notes: str = ""
+) -> Dict[str, Any]:
     """
-    Constructs a dual-mode report containing both a Patient-Friendly Plain Language Summary
-    and a Technical Clinical Radiology Impression.
+    Constructs a comprehensive, dual-mode report adhering to non-definitive AI safety standards.
+    Outputs structured Findings, AI Assessment, Calibrated Confidence, and Recommendation sections.
     """
     case_id = analysis_result.get("case_id", "UNKNOWN")
     model_ver = analysis_result.get("model_version", "densenet121-cxr-v1.0")
@@ -134,55 +168,110 @@ def generate_structured_report(analysis_result: Dict[str, Any], clinician_notes:
 
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-    # Group findings
-    positives = [p for p in predictions if p["positive"] and p["label"] != "No Finding"]
+    # Positive findings excluding 'No Finding'
+    positives = [p for p in predictions if p.get("positive", False) and p["label"] not in ("No Finding", "No_Finding", "Normal")]
 
     # 1. Plain English Patient Summary
     patient_summary = generate_plain_patient_summary(primary, predictions)
 
     # 2. Formal Technical Clinical Findings Section
     view_pos = dicom.get("view_position", "Frontal (PA/AP)")
-    technique_text = f"Single frontal chest radiograph ({view_pos}). Exposure/Quality index: {quality}."
+    technique_text = f"Single frontal chest radiograph projection ({view_pos}). Acquisition Quality Index: {quality}."
 
     findings_paragraphs = []
-    
+
     # Lungs & Airspace
     pna = next((p for p in predictions if p["label"] == "Pneumonia"), None)
     ate = next((p for p in predictions if p["label"] == "Atelectasis"), None)
-    
+
     lung_obs = []
-    if pna and pna["positive"]:
-        lung_obs.append(f"Focal airspace consolidation / alveolar opacity compatible with Pneumonia (Model confidence: {pna['probability_percent']}%, {pna['confidence_band']}).")
-    if ate and ate["positive"]:
-        lung_obs.append(f"Linear plate-like subsegmental opacification in the lung base indicative of Atelectasis (Model confidence: {ate['probability_percent']}%).")
-    if not lung_obs:
-        lung_obs.append("Lungs appear clear without overt focal consolidation, pneumothorax, or infiltrates.")
+    if pna and pna.get("positive", False):
+        lung_obs.append(
+            f"Focal increased density / opacity observed in the pulmonary parenchyma. "
+            f"AI pattern suggestive of Pneumonia (Calibrated probability: {pna['probability_percent']}%, "
+            f"Cutoff: {int(pna.get('threshold', 0.51)*100)}%, Band: {pna.get('confidence_band', 'MODERATE')})."
+        )
+    elif pna:
+        lung_obs.append(
+            f"No overt consolidation or dense infiltrates above decision threshold "
+            f"(Pneumonia calibrated probability: {pna['probability_percent']}%, Cutoff: {int(pna.get('threshold', 0.51)*100)}%)."
+        )
+    else:
+        lung_obs.append("Lungs appear expanded without gross focal consolidation or pneumothorax on available projection.")
+
+    if ate and ate.get("positive", False):
+        lung_obs.append(
+            f"Subsegmental linear plate-like opacification suggestive of Atelectasis "
+            f"(Probability: {ate['probability_percent']}%)."
+        )
+
     findings_paragraphs.append("LUNGS & AIRSPACE: " + " ".join(lung_obs))
 
-    # Pleura
+    # Pleura & Effusion
     eff = next((p for p in predictions if p["label"] == "Pleural Effusion"), None)
-    if eff and eff["positive"]:
-        findings_paragraphs.append(f"PLEURAL SPACES: Blunting of lateral costophrenic angle with fluid meniscus compatible with Pleural Effusion (Model probability: {eff['probability_percent']}%, {eff['confidence_band']}).")
+    if eff and eff.get("positive", False):
+        findings_paragraphs.append(
+            f"PLEURAL SPACES: Blunting of costophrenic angle suggestive of Pleural Effusion "
+            f"(Probability: {eff['probability_percent']}%, {eff.get('confidence_band', '')})."
+        )
     else:
-        findings_paragraphs.append("PLEURAL SPACES: Costophrenic sulci and cardiophrenic angles are sharp and free of fluid.")
+        findings_paragraphs.append(
+            "PLEURAL SPACES: Costophrenic and cardiophrenic angles appear preserved without definitive pleural fluid level."
+        )
 
-    # Cardiac Silhouette
+    # Mediastinum & Cardiac Silhouette
     cardio = next((p for p in predictions if p["label"] == "Cardiomegaly"), None)
-    if cardio and cardio["positive"]:
-        findings_paragraphs.append(f"CARDIAC SILHOUETTE: Transverse cardiothoracic ratio enlarged compatible with Cardiomegaly (Model probability: {cardio['probability_percent']}%).")
+    if cardio and cardio.get("positive", False):
+        findings_paragraphs.append(
+            f"CARDIAC SILHOUETTE: Transverse cardiothoracic ratio enlarged, pattern suggestive of Cardiomegaly "
+            f"(Probability: {cardio['probability_percent']}%)."
+        )
     else:
-        findings_paragraphs.append("CARDIAC SILHOUETTE: Cardiac size and mediastinal contours are within normal physiological limits.")
+        findings_paragraphs.append(
+            "CARDIAC SILHOUETTE: Cardiac contour and mediastinal width are within normal limits for projection."
+        )
 
-    # 3. Impression Section
-    impression_lines = []
+    # 3. AI Assessment Section
     if positives:
-        pos_names = [f"{p['label']} ({p['probability_percent']}%)" for p in positives]
-        impression_lines.append(f"1. AI-assisted screening identified positive finding(s): {', '.join(pos_names)}.")
-        impression_lines.append(f"2. Primary radiological finding: {primary}.")
+        suggested_list = [f"{p['label']} (Calibrated prob: {p['probability_percent']}%)" for p in positives]
+        ai_assessment_text = (
+            f"AI Assessment: Screening patterns suggestive of {', '.join(suggested_list)}. "
+            "Probabilistic pattern matching only; not a confirmed clinical diagnosis."
+        )
     else:
-        impression_lines.append("1. No acute cardiopulmonary abnormality detected above tuned decision thresholds.")
+        ai_assessment_text = (
+            "AI Assessment: No acute radiographic findings suggested above calibrated screening thresholds. "
+            "Does not rule out early-stage or non-radiopaque pathology."
+        )
 
-    impression_lines.append("3. Grad-CAM++ activation maps generated to confirm spatial focus of deep learning network.")
+    # 4. Calibrated Confidence Summary
+    conf_lines = []
+    for p in predictions:
+        status_flag = "SUSPICIOUS / POSITIVE" if p.get("positive") and p["label"] != "No Finding" else ("NORMAL PATTERN" if p["label"] == "No Finding" and p.get("positive") else "BELOW CUTOFF")
+        conf_lines.append(
+            f"{p['label']}: {p['probability_percent']}% (Cutoff: {int(p.get('threshold', 0.5)*100)}%, "
+            f"Confidence: {p.get('confidence_band', '').replace('_', ' ')}, Status: {status_flag})"
+        )
+    confidence_summary_text = "\n".join(conf_lines)
+
+    # 5. Recommendation Section
+    if positives:
+        recommendation_text = (
+            "RECOMMENDATION: Formal clinical and radiologist review recommended for diagnostic verification, "
+            "correlation with physical examination, patient symptoms, and determination of therapeutic intervention."
+        )
+    else:
+        recommendation_text = (
+            "RECOMMENDATION: Clinical review recommended. Correlate with clinical presentation. "
+            "Re-evaluate or consider targeted diagnostic workup if respiratory symptoms persist."
+        )
+
+    # 6. Provider Impression Section
+    impression_lines = [
+        f"1. {ai_assessment_text}",
+        f"2. {recommendation_text}",
+        "3. Explainability: Grad-CAM++ neural activation map generated for anatomical localization verification."
+    ]
 
     return {
         "report_id": f"RPT-{case_id}",
@@ -191,12 +280,15 @@ def generate_structured_report(analysis_result: Dict[str, Any], clinician_notes:
         "model_version": model_ver,
         "technique": technique_text,
         "quality_assessment": quality,
-        "patient_friendly_summary": patient_summary,
-        "technical_findings": "\n\n".join(findings_paragraphs),
         "findings": "\n\n".join(findings_paragraphs),
+        "technical_findings": "\n\n".join(findings_paragraphs),
+        "ai_assessment": ai_assessment_text,
+        "confidence_summary": confidence_summary_text,
+        "recommendation": recommendation_text,
         "impression": "\n".join(impression_lines),
         "primary_finding": primary,
         "positive_findings": [p["label"] for p in positives],
+        "patient_friendly_summary": patient_summary,
         "clinician_notes": clinician_notes or "None provided at ingestion time.",
         "disclaimer": STANDARD_DISCLAIMER
     }
