@@ -11,6 +11,7 @@ import PatientDashboard from './components/PatientDashboard';
 import ReportModal from './components/ReportModal';
 import AuditDrawer from './components/AuditDrawer';
 import AuthModal from './components/AuthModal';
+import TamperAuditTab from './components/TamperAuditTab';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { fetchSystemHealth, fetchSamples, analyzeImage } from './api';
 
@@ -102,7 +103,7 @@ function MainApp() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container pt-[85px] bg-surface-base">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -168,6 +169,12 @@ function MainApp() {
       {activeTab === 'history' && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <CareHistoryTab />
+        </div>
+      )}
+
+      {activeTab === 'tamper' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <TamperAuditTab onNavigateSafe={() => setActiveTab('single')} />
         </div>
       )}
 
