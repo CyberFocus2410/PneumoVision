@@ -68,3 +68,9 @@ backend/static/heatmaps/*.png
 !backend/static/heatmaps/.gitkeep
 backend/static/reports/*.pdf
 !backend/static/reports/.gitkeep
+
+# Kaggle credentials and staging
+kaggle.json
+.kaggle_staging/
+models/kaggle_output/
+data/chest_xray/
