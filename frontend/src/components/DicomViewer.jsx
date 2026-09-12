@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Eye, ZoomIn, ZoomOut, RotateCcw, Sliders, Layers, Sparkles,
-  Image as ImageIcon, Crosshair, HelpCircle, MapPin, Maximize2
+  Image as ImageIcon, Crosshair, HelpCircle, MapPin, Maximize2, Loader2
 } from 'lucide-react';
 
 const WINDOW_PRESETS = [
@@ -14,7 +14,8 @@ const WINDOW_PRESETS = [
 export default function DicomViewer({
   analysisResult,
   selectedFinding,
-  setSelectedFinding
+  setSelectedFinding,
+  isAnalyzing = false
 }) {
   const [viewMode, setViewMode] = useState('overlay'); // 'overlay', 'side', 'original'
   const [zoom, setZoom] = useState(1.0);
@@ -137,7 +138,31 @@ export default function DicomViewer({
       </div>
 
       {/* Main Radiograph Canvas */}
-      <div className="pacs-canvas-wrapper">
+      <div className="pacs-canvas-wrapper" style={{ position: 'relative' }}>
+        {isAnalyzing && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(11, 15, 25, 0.78)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            zIndex: 30,
+            borderRadius: 'var(--radius-sm)'
+          }}>
+            <Loader2 size={36} color="var(--cyan-primary)" className="status-dot" />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Executing Neural Inference & Attention Heatmaps...
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              DenseNet-121 &bull; Grad-CAM++ &bull; Calibrated Uncertainty
+            </span>
+          </div>
+        )}
+
         {displayUrl ? (
           <>
             <img

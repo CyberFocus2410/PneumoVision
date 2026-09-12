@@ -79,22 +79,35 @@ export default function UploadPanel({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {samples.map((s) => {
             const isSelected = selectedSample === s.id && !uploadedFileName;
-            const isNormal = s.ground_truth === 'No Finding';
+            const isNormal = s.ground_truth === 'No Finding' || s.ground_truth?.includes('Negative') || s.ground_truth?.includes('Normal');
+            const isThisCaseAnalyzing = isSelected && isAnalyzing;
 
             return (
               <div
                 key={s.id}
                 className={`worklist-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectSample(s.id)}
+                style={{
+                  cursor: isAnalyzing ? 'wait' : 'pointer',
+                  transition: 'all 0.15s ease',
+                  position: 'relative'
+                }}
               >
                 <div className="worklist-item-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <User size={13} color="var(--cyan-primary)" />
                     <span className="patient-name-tag">{s.patient_name}</span>
                   </div>
-                  <span className={`ground-truth-badge ${isNormal ? 'normal' : 'abnormal'}`}>
-                    {s.ground_truth}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {isThisCaseAnalyzing && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--cyan-primary)', fontSize: '0.62rem', fontFamily: 'var(--font-mono)' }}>
+                        <Loader2 size={10} className="status-dot" /> Analyzing
+                      </span>
+                    )}
+                    <span className={`ground-truth-badge ${isNormal ? 'normal' : 'abnormal'}`}>
+                      {s.ground_truth}
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>

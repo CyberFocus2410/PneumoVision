@@ -107,6 +107,7 @@ export default function App() {
             analysisResult={analysisResult}
             selectedFinding={selectedFinding}
             setSelectedFinding={setSelectedFinding}
+            isAnalyzing={isAnalyzing}
           />
 
           {/* Right Column: Dual-Mode Intelligence Panel (Patient vs Clinician) */}
