@@ -243,7 +243,7 @@ export default function AccessControlTab() {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-space-md">
                 <div className="md:col-span-7 flex flex-col gap-1">
                   <label className="font-label-md text-label-md text-text-secondary flex items-center justify-between">
-                    <span>INSTITUTIONAL ID OR ETHEREUM ADDRESS</span>
+                    <span>INSTITUTIONAL ID OR MST BLOCKCHAIN / BRIDGEKEY</span>
                     <span className="text-text-muted font-normal">Hex / ENS / Node Identifier</span>
                   </label>
                   <div className="relative flex items-center">
@@ -487,7 +487,7 @@ export default function AccessControlTab() {
               <thead>
                 <tr className="bg-surface-nested text-text-secondary font-headline-sm text-headline-sm uppercase text-[11px] tracking-wider border-b border-border-grid">
                   <th className="py-2.5 px-space-md font-semibold">Hospital / Entity Name</th>
-                  <th className="py-2.5 px-space-md font-semibold">Ethereum Address / Node ID</th>
+                  <th className="py-2.5 px-space-md font-semibold">MST Blockchain / BridgeKey Node ID</th>
                   <th className="py-2.5 px-space-md font-semibold">Scope Granted</th>
                   <th className="py-2.5 px-space-md font-semibold">Grant Timestamp</th>
                   <th className="py-2.5 px-space-md font-semibold">Expiration / State</th>

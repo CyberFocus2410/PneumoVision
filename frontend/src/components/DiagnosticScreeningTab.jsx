@@ -694,35 +694,25 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
               className="relative max-w-[540px] w-full max-h-[620px] flex items-center justify-center transition-transform duration-200"
               style={{ transform: `scale(${zoomLevel / 100})` }}
             >
+              {/* Base Raw Radiograph Layer */}
               <img
-                src={imageDisplayUrl}
+                src={analysisResult?.original_image_url || customUploadPreview || activeProfile?.image_url || '/static/samples/sample_pneumonia.png'}
                 alt="Chest Radiograph Frontal View"
                 className="w-full h-auto object-contain rounded-lg shadow-2xl transition-[filter] duration-200 border border-slate-800"
                 style={{ filter: getFilterStyle() }}
               />
 
-              {/* Dynamic Grad-CAM Hotspot for Abnormalities */}
-              {camVisible && isPneumonia && (
-                <div
-                  className="absolute inset-0 pointer-events-none transition-opacity duration-150 rounded-lg overflow-hidden"
-                  style={{ opacity: camOpacity / 100, mixBlendMode: 'screen' }}
-                >
-                  <svg className="w-full h-full" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                      <radialGradient id="gradcam-active" cx="38%" cy="65%" fx="38%" fy="65%" r="24%">
-                        <stop offset="0%" stopColor="#DC2626" stopOpacity="0.95" />
-                        <stop offset="35%" stopColor="#EA580C" stopOpacity="0.80" />
-                        <stop offset="65%" stopColor="#FBBF24" stopOpacity="0.60" />
-                        <stop offset="85%" stopColor="#0284C7" stopOpacity="0.30" />
-                        <stop offset="100%" stopColor="#0284C7" stopOpacity="0.0" />
-                      </radialGradient>
-                    </defs>
-                    <ellipse cx="380" cy="650" rx="170" ry="150" fill="url(#gradcam-active)" filter="blur(8px)" />
-                    <text x="230" y="580" fill="#FDE68A" fontFamily="monospace" fontSize="14" fontWeight="bold">
-                      {focusZoneDisplay.toUpperCase()}
-                    </text>
-                  </svg>
-                </div>
+              {/* Real Neural Grad-CAM++ Heatmap Overlay Layer */}
+              {(analysisResult?.heatmaps?.Pneumonia?.overlay_url || (isPneumonia && activeProfile?.image_url)) && (
+                <img
+                  src={analysisResult?.heatmaps?.Pneumonia?.overlay_url || activeProfile?.image_url}
+                  alt="Grad-CAM Activation Overlay"
+                  className="absolute inset-0 w-full h-full object-contain rounded-lg pointer-events-none transition-opacity duration-150"
+                  style={{
+                    opacity: camVisible && isPneumonia ? camOpacity / 100 : 0,
+                    filter: getFilterStyle()
+                  }}
+                />
               )}
             </div>
 
