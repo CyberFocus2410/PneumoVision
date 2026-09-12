@@ -83,3 +83,90 @@ export async function submitClinicianFeedback({ caseId, finding, agreement, note
   });
   return res.json();
 }
+
+export async function grantConsent({ patientId, providerAddress, callerAddress = null }) {
+  const res = await fetch(`${API_BASE}/consent/grant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      patient_id: patientId,
+      provider_address: providerAddress,
+      caller_address: callerAddress
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to grant consent' }));
+    throw new Error(err.detail || 'Failed to grant consent');
+  }
+  return res.json();
+}
+
+export async function revokeConsent({ patientId, providerAddress, callerAddress = null }) {
+  const res = await fetch(`${API_BASE}/consent/revoke`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      patient_id: patientId,
+      provider_address: providerAddress,
+      caller_address: callerAddress
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to revoke consent' }));
+    throw new Error(err.detail || 'Failed to revoke consent');
+  }
+  return res.json();
+}
+
+export async function fetchPatientRecords(patientId, callerAddress = null) {
+  let url = `${API_BASE}/records/${encodeURIComponent(patientId)}`;
+  if (callerAddress) {
+    url += `?caller_address=${encodeURIComponent(callerAddress)}`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to retrieve records' }));
+    throw new Error(err.detail || 'Failed to retrieve records');
+  }
+  return res.json();
+}
+
+export async function addTreatmentRecord(patientId, payload) {
+  const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/treatment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to add treatment record' }));
+    throw new Error(err.detail || 'Failed to add treatment record');
+  }
+  return res.json();
+}
+
+export async function addMedicationRecord(patientId, payload) {
+  const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/medication`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to add medication record' }));
+    throw new Error(err.detail || 'Failed to add medication record');
+  }
+  return res.json();
+}
+
+export async function addOutcomeRecord(patientId, payload) {
+  const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/outcome`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to add outcome record' }));
+    throw new Error(err.detail || 'Failed to add outcome record');
+  }
+  return res.json();
+}
+

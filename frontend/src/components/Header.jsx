@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, ShieldAlert, Cpu, Moon, Sun, Layers, GitCompare, Info } from 'lucide-react';
+import { Activity, ShieldAlert, Moon, Sun, Layers, GitCompare, Info, Shield, History } from 'lucide-react';
 
 export default function Header({ activeTab, setActiveTab, healthData, theme, setTheme, onOpenAudit }) {
   return (
@@ -42,7 +42,20 @@ export default function Header({ activeTab, setActiveTab, healthData, theme, set
           >
             <GitCompare size={14} /> Longitudinal Study
           </button>
+          <button
+            className={`nav-tab-btn ${activeTab === 'access' ? 'active' : ''}`}
+            onClick={() => setActiveTab('access')}
+          >
+            <Shield size={14} /> Access Control
+          </button>
+          <button
+            className={`nav-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            <History size={14} /> Care History
+          </button>
         </div>
+
 
         {/* Right Status & Controls */}
         <div className="header-actions">

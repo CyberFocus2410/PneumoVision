@@ -4,6 +4,8 @@ import UploadPanel from './components/UploadPanel';
 import DicomViewer from './components/DicomViewer';
 import FindingsPanel from './components/FindingsPanel';
 import LongitudinalTab from './components/LongitudinalTab';
+import AccessControlTab from './components/AccessControlTab';
+import CareHistoryTab from './components/CareHistoryTab';
 import ReportModal from './components/ReportModal';
 import AuditDrawer from './components/AuditDrawer';
 import { fetchSystemHealth, fetchSamples, analyzeImage } from './api';
@@ -86,7 +88,7 @@ export default function App() {
         onOpenAudit={() => setShowAuditDrawer(true)}
       />
 
-      {activeTab === 'single' ? (
+      {activeTab === 'single' && (
         <main className="pacs-workspace-grid">
           {/* Left Column: Patient Worklist & Acquisition */}
           <UploadPanel
@@ -115,9 +117,23 @@ export default function App() {
             onOpenReport={() => setShowReportModal(true)}
           />
         </main>
-      ) : (
+      )}
+
+      {activeTab === 'longitudinal' && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <LongitudinalTab />
+        </div>
+      )}
+
+      {activeTab === 'access' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <AccessControlTab />
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <CareHistoryTab />
         </div>
       )}
 
@@ -138,3 +154,4 @@ export default function App() {
     </div>
   );
 }
+
