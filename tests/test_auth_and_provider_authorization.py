@@ -291,3 +291,161 @@ def test_patient_profile_retrieval_and_post_signup_wallet_linking(client):
     assert prof_res_updated.status_code == 200
     assert prof_res_updated.json()["wallet_address"] == test_wallet
 
+
+def test_full_chain_security_and_consent_enforcement_with_local_dev_mode_off(client):
+    """
+    Comprehensive End-to-End Test verifying the full security chain with LOCAL_DEV_MODE=false:
+    1. Unapproved doctor is blocked at signup time from writing (require_doctor + is_verified).
+    2. Approved-but-unauthorized-for-this-patient doctor is blocked from reading (contract AccessDenied).
+    3. After patient grants consent on-chain, reads succeed.
+    4. After patient revokes consent on-chain, reads are blocked again.
+    5. Patient can only ever read their own record via /v1/me/records (and is blocked from reading other patients).
+    """
+    bc_client = get_blockchain_client()
+    uid = uuid.uuid4().hex[:8]
+
+    # Step A: Create Patient 1
+    pat1_res = client.post("/v1/auth/patient/signup", json={
+        "email": f"patient_e2e_1_{uid}@example.com",
+        "password": "Password123!",
+        "full_name": "Patient One"
+    })
+    assert pat1_res.status_code == 201
+    pat1_token = pat1_res.json()["access_token"]
+    pat1_id = pat1_res.json()["user"]["patient_id"]
+
+    # Step B: Create Patient 2 (for cross-patient isolation check)
+    pat2_res = client.post("/v1/auth/patient/signup", json={
+        "email": f"patient_e2e_2_{uid}@example.com",
+        "password": "Password123!",
+        "full_name": "Patient Two"
+    })
+    assert pat2_res.status_code == 201
+    pat2_id = pat2_res.json()["user"]["patient_id"]
+
+    # Step C: Onboard Doctor (is_verified = False)
+    doc_wallet = bc_client.accounts[5] if len(bc_client.accounts) > 5 else bc_client.admin_account
+    doc_res = client.post("/v1/auth/doctor/signup", json={
+        "email": f"doctor_chain_{uid}@pneumovision.ai",
+        "password": "DocPassword123!",
+        "full_name": "Dr. Chain Specialist",
+        "wallet_address": doc_wallet,
+        "medical_license": f"MD-CHAIN-{uid.upper()}",
+        "hospital_affiliation": "PneumoVision Secure Trust"
+    })
+    assert doc_res.status_code == 201
+    doc_user = doc_res.json()["user"]
+    assert doc_user["is_verified"] is False
+    unapproved_doc_token = doc_res.json()["access_token"]
+    doctor_db_id = doc_user["id"]
+
+    # 1. Unapproved doctor is blocked from writing care records
+    unapproved_write = client.post(
+        f"/v1/records/{pat1_id}/treatment",
+        headers={"Authorization": f"Bearer {unapproved_doc_token}"},
+        json={
+            "treatment_description": "Initial Care Plan",
+            "treatment_type": "Standard Protocol"
+        }
+    )
+    assert unapproved_write.status_code == 403
+    assert "pending administrative verification" in unapproved_write.json()["detail"]
+
+    # Step D: Admin approves doctor (executing on-chain authorizeProvider)
+    admin_login = client.post("/v1/auth/doctor/login", json={
+        "email": "admin@pneumovision.ai",
+        "password": "AdminPassword2026!"
+    })
+    admin_token = admin_login.json()["access_token"]
+    admin_auth_res = client.post(
+        "/v1/admin/providers/authorize",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"doctor_id": doctor_db_id}
+    )
+    assert admin_auth_res.status_code == 200
+    assert bc_client.contract.functions.authorizedProviders(doc_wallet).call() is True
+
+    # Doctor logs in to obtain verified token
+    doc_login = client.post("/v1/auth/doctor/login", json={
+        "email": f"doctor_chain_{uid}@pneumovision.ai",
+        "password": "DocPassword123!"
+    })
+    approved_doc_token = doc_login.json()["access_token"]
+
+    # Verified doctor writes a treatment record for Patient 1
+    doc_write_res = client.post(
+        f"/v1/records/{pat1_id}/treatment",
+        headers={"Authorization": f"Bearer {approved_doc_token}"},
+        json={
+            "treatment_description": "High-Flow Supplemental O2 and 1g Ceftriaxone",
+            "treatment_type": "Critical Protocol"
+        }
+    )
+    assert doc_write_res.status_code == 200
+
+    # 2. Approved-but-unauthorized-for-this-patient doctor is blocked from reading
+    unauthorized_read = client.get(
+        f"/v1/records/{pat1_id}",
+        headers={"Authorization": f"Bearer {approved_doc_token}"}
+    )
+    assert unauthorized_read.status_code == 403
+    assert "Access Denied" in unauthorized_read.json()["detail"]
+
+    # 3. Patient 1 grants consent on-chain to this doctor
+    grant_res = client.post(
+        "/v1/consent/grant",
+        headers={"Authorization": f"Bearer {pat1_token}"},
+        json={
+            "patient_id": pat1_id,
+            "provider_address": doc_wallet
+        }
+    )
+    assert grant_res.status_code == 200
+    assert grant_res.json()["status"] == "success"
+
+    # Now doctor reads Patient 1's records -> must succeed!
+    authorized_read = client.get(
+        f"/v1/records/{pat1_id}",
+        headers={"Authorization": f"Bearer {approved_doc_token}"}
+    )
+    assert authorized_read.status_code == 200
+    records_data = authorized_read.json()
+    assert records_data["status"] == "success"
+    assert len(records_data["records"]) >= 1
+
+    # 4. Patient 1 revokes consent on-chain
+    revoke_res = client.post(
+        "/v1/consent/revoke",
+        headers={"Authorization": f"Bearer {pat1_token}"},
+        json={
+            "patient_id": pat1_id,
+            "provider_address": doc_wallet
+        }
+    )
+    assert revoke_res.status_code == 200
+
+    # Doctor reads again after revoke -> must be blocked with 403 Forbidden!
+    blocked_read_after_revoke = client.get(
+        f"/v1/records/{pat1_id}",
+        headers={"Authorization": f"Bearer {approved_doc_token}"}
+    )
+    assert blocked_read_after_revoke.status_code == 403
+
+    # 5. Patient self-read isolation:
+    # Patient 1 reads own record via /v1/me/records -> succeeds
+    my_records_res = client.get(
+        "/v1/me/records",
+        headers={"Authorization": f"Bearer {pat1_token}"}
+    )
+    assert my_records_res.status_code == 200
+    assert my_records_res.json()["patient_id"] == pat1_id
+
+    # Patient 1 attempts to read Patient 2's records via /v1/records/{pat2_id} -> blocked
+    cross_patient_read = client.get(
+        f"/v1/records/{pat2_id}",
+        headers={"Authorization": f"Bearer {pat1_token}"}
+    )
+    assert cross_patient_read.status_code == 403
+    assert "restricted to reading their own patient records" in cross_patient_read.json()["detail"]
+
+

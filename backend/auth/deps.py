@@ -54,6 +54,24 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Returns authenticated User if valid Bearer token is passed, otherwise None."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id = payload.get("sub")
+        if user_id:
+            return db.query(User).filter(User.id == int(user_id)).first()
+    except Exception:
+        return None
+    return None
+
+
+
 async def require_patient(current_user: User = Depends(get_current_user)) -> User:
     """Ensures caller has the PATIENT role."""
     if current_user.role not in (UserRole.PATIENT.value, UserRole.ADMIN.value):

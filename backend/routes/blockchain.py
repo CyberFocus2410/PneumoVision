@@ -22,7 +22,7 @@ from backend.blockchain.store import (
     save_offchain_record,
     compute_content_hash,
 )
-from backend.auth.deps import require_patient, require_doctor, get_current_user
+from backend.auth.deps import require_patient, require_doctor, get_current_user, get_optional_current_user
 from backend.db.models import User, UserRole
 
 router = APIRouter(tags=["Blockchain & Care Timeline"])
@@ -362,41 +362,28 @@ async def add_outcome_record(
         )
 
 
-@router.get("/me/records")
-@router.get("/v1/me/records")
-@router.get("/v1/records/me")
-async def get_my_patient_records(
-    current_patient: User = Depends(require_patient)
-):
-    """
-    Retrieves full chronological, hash-verified care timeline for the currently
-    authenticated patient. Patient ID is derived strictly server-side from the auth token.
-    """
-    if not current_patient.patient_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No on-chain patient identity linked to this patient account."
-        )
-    return await get_patient_records(
-        patient_id=current_patient.patient_id,
-        caller_address=current_patient.wallet_address
-    )
-
-
-@router.get("/records/{patient_id}")
-@router.get("/v1/records/{patient_id}")
-async def get_patient_records(
+async def _fetch_patient_records_internal(
     patient_id: str,
-    caller_address: Optional[str] = Query(None, description="Ethereum address of caller requesting access")
+    caller_address: Optional[str] = None,
+    current_user: Optional[User] = None
 ):
-    """
-    Retrieves full chronological, hash-verified care timeline across all record types
-    (Diagnosis -> Treatment -> Medication -> Outcome) with lineage links and tamper warnings.
-    Reverts with 403 Forbidden if caller has not been granted consent on-chain.
-    """
     try:
         client = get_blockchain_client()
-        resolved_caller = caller_address or client.default_patient
+
+        # Enforce patient self-read isolation: patients cannot read other patients' records
+        if current_user and isinstance(current_user, User) and current_user.role == UserRole.PATIENT.value and current_user.patient_id:
+            req_hash = to_hex_bytes32(patient_id).lower()
+            user_hash = to_hex_bytes32(current_user.patient_id).lower()
+            if req_hash != user_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access Denied: Patients are strictly restricted to reading their own patient records."
+                )
+
+        if current_user and isinstance(current_user, User):
+            resolved_caller = caller_address or current_user.wallet_address or (client.default_patient if current_user.role == UserRole.PATIENT.value else client.admin_account)
+        else:
+            resolved_caller = caller_address or client.default_patient
 
         # 1. Fetch on-chain record list (reverts on-chain if unauthorized)
         onchain_records = client.get_records(patient_id=patient_id, caller_address=resolved_caller)
@@ -458,6 +445,8 @@ async def get_patient_records(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access Denied: Caller '{caller_address or 'Default'}' has not been granted consent to access records for patient '{patient_id}'."
         )
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
         if "AccessDenied" in error_msg:
@@ -469,3 +458,45 @@ async def get_patient_records(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve records: {error_msg}"
         )
+
+
+@router.get("/me/records")
+@router.get("/v1/me/records")
+@router.get("/v1/records/me")
+async def get_my_patient_records(
+    current_patient: User = Depends(require_patient)
+):
+    """
+    Retrieves full chronological, hash-verified care timeline for the currently
+    authenticated patient. Patient ID is derived strictly server-side from the auth token.
+    """
+    if not current_patient.patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No on-chain patient identity linked to this patient account."
+        )
+    return await _fetch_patient_records_internal(
+        patient_id=current_patient.patient_id,
+        caller_address=current_patient.wallet_address,
+        current_user=current_patient
+    )
+
+
+@router.get("/records/{patient_id}")
+@router.get("/v1/records/{patient_id}")
+async def get_patient_records(
+    patient_id: str,
+    caller_address: Optional[str] = Query(None, description="Ethereum address of caller requesting access"),
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    """
+    Retrieves full chronological, hash-verified care timeline across all record types
+    (Diagnosis -> Treatment -> Medication -> Outcome) with lineage links and tamper warnings.
+    Reverts with 403 Forbidden if caller has not been granted consent on-chain.
+    """
+    return await _fetch_patient_records_internal(
+        patient_id=patient_id,
+        caller_address=caller_address,
+        current_user=current_user
+    )
+
