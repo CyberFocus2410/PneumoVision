@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from src.config import STATIC_DIR, HEATMAPS_DIR, REPORTS_DIR, BASE_DIR
+from src.config import STATIC_DIR, HEATMAPS_DIR, REPORTS_DIR, SAMPLES_DIR, BASE_DIR
 from backend.db.database import init_db, SessionLocal
 from backend.db.models import User, UserRole
 from backend.auth.security import hash_password
@@ -103,6 +103,7 @@ app.add_middleware(
 )
 
 # Mount static asset folders
+app.mount("/static/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Register API routers

@@ -1,279 +1,207 @@
-import React from 'react';
-import {
-  AlertTriangle,
-  Layers,
-  Shield,
-  History,
-  ShieldAlert,
-  Stethoscope,
-  User,
-  LogOut,
-  KeyRound,
-  Sun,
-  Moon,
-  Info
-} from 'lucide-react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { MonoHash, StatusPill, Badge } from './common';
 
-export default function Header({
-  activeTab,
-  setActiveTab,
-  healthData,
-  theme,
-  setTheme,
-  onOpenAudit,
-  onOpenAuth
-}) {
-  const { user, role, is_verified, isAuthenticated, patient_id, wallet_address, logout } = useAuth();
+export default function Header({ activeTab, setActiveTab, onOpenAuth }) {
+  const { user, role, isAuthenticated, logout } = useAuth();
+  const [copied, setCopied] = useState(false);
 
-  const currentPatient = patient_id || '0x8f4c21e07b7194f2d348b29a';
+  const patientHash = '0x8f4c21e07b7194f2d348b29a';
+  const patientDisplay = '0x8f4c...b29a';
+
+  const handleCopyPatient = () => {
+    navigator.clipboard.writeText(patientHash);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-dicom-surface text-dicom-text-primary border-b border-dicom-border select-none">
-      {/* Top Clinical & Network Strip */}
+    <header className="sticky top-0 z-50 w-full bg-dicom-surface text-dicom-text-primary select-none font-sans border-b border-dicom-border shadow-md">
+      {/* Upper Navigation Strip (h-14) */}
       <div className="h-14 w-full px-space-md flex items-center justify-between border-b border-dicom-border">
-        {/* Brand & Identity */}
+        {/* Brand Logo & Node / Patient Identifiers */}
         <div className="flex items-center gap-space-md">
-          <div className="flex items-center gap-space-sm cursor-pointer" onClick={() => setActiveTab('single')}>
-            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center border border-dicom-border">
-              <span className="font-bold text-secondary text-sm">PV</span>
+          <div
+            className="flex items-center gap-2 cursor-pointer select-none"
+            onClick={() => setActiveTab('screening')}
+          >
+            <div className="w-8 h-8 rounded bg-[#070A0F] border border-dicom-border flex items-center justify-center shrink-0 shadow-sm">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="24" height="24" rx="3" fill="#070A0F" />
+                <path d="M6 12h12M12 6v12" stroke="#006781" strokeWidth="2" strokeLinecap="square" />
+                <path d="M8 15c0 2.5 1.8 4 4 4s4-1.5 4-4v-5H8v5z" stroke="#94A3B8" strokeWidth="1.4" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="2" fill="#8FDFFF" />
+              </svg>
             </div>
-            <div className="flex flex-col">
-              <span className="font-headline-sm text-headline-sm tracking-tight text-dicom-text-primary font-bold">
-                PneumoVision
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[17px] tracking-tight text-white whitespace-nowrap leading-none">
+                Pneumo<span className="text-[#8FDFFF]">Vision</span>
               </span>
-              <span className="text-[10px] text-dicom-text-secondary leading-none">
-                Clinical Workstation
+              <span className="px-1.5 py-0.5 bg-[#1E293B] text-[#94A3B8] text-[9px] font-mono font-semibold tracking-wider rounded border border-dicom-border">
+                CLINICAL
               </span>
             </div>
           </div>
 
-          <Badge variant="dark" size="sm">
-            MST TESTNET (4731)
-          </Badge>
+          <span className="font-label-sm text-label-sm bg-primary-container text-secondary-container border border-dicom-border px-space-xs py-0.5 rounded font-mono font-medium">
+            NODE #04-MST_TESTNET
+          </span>
 
-          {/* Active Patient Identifier */}
           <div className="hidden sm:flex items-center gap-space-xs bg-dicom-canvas px-space-sm py-1 rounded border border-dicom-border">
             <span className="font-label-sm text-label-sm text-dicom-text-secondary">PATIENT:</span>
-            <MonoHash
-              hash={currentPatient}
-              truncate
-              theme="pacs"
-              size="sm"
-            />
-            <StatusPill status="verified" label="CONSENT ACTIVE" size="sm" />
+            <span className="font-code-hash text-code-hash text-dicom-text-primary" title={patientHash}>
+              {patientDisplay}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyPatient}
+              className="text-dicom-text-secondary hover:text-dicom-text-primary p-0.5 ml-0.5 cursor-pointer"
+              title="Copy Patient Address"
+            >
+              <span className="material-symbols-outlined text-[14px]">
+                {copied ? 'check' : 'content_copy'}
+              </span>
+            </button>
+            <span className="inline-flex items-center gap-1 font-label-sm text-label-sm text-status-verified bg-status-verified-bg/10 border border-status-verified/40 px-1 py-0.5 rounded ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-status-verified" />
+              CONSENT ACTIVE
+            </span>
           </div>
         </div>
 
         {/* Center Nav Tabs */}
-        <nav className="hidden xl:flex items-center h-full gap-space-xs">
+        <nav className="hidden lg:flex items-center h-full gap-space-xs">
           <button
             type="button"
-            onClick={() => setActiveTab('single')}
-            className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
-              activeTab === 'single'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm'
+            onClick={() => setActiveTab('screening')}
+            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
+              activeTab === 'screening'
+                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
                 : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>AI Diagnostic Screening</span>
+            AI Diagnostic Screening
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('access')}
-            className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
               activeTab === 'access'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm'
+                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
                 : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
             }`}
           >
-            <Shield className="w-4 h-4" />
-            <span>Patient Access & Consents</span>
+            Patient Access &amp; Consents
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
               activeTab === 'history'
-                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm'
+                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
                 : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
             }`}
           >
-            <History className="w-4 h-4" />
-            <span>Care History Ledger</span>
+            Care History Ledger
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('tamper')}
-            className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
+            className={`h-full flex items-center px-space-md font-body-md text-body-md transition-colors ${
               activeTab === 'tamper'
-                ? 'bg-surface-card text-alert-tamper border-t-2 border-alert-tamper font-headline-sm'
-                : 'text-dicom-text-secondary hover:text-alert-tamper hover:bg-dicom-border/40'
+                ? 'bg-surface-card text-text-primary border-t-2 border-secondary font-headline-sm text-headline-sm'
+                : 'text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border/40'
             }`}
           >
-            <ShieldAlert className="w-4 h-4" />
-            <span>Tamper Audit & Integrity</span>
+            Tamper Audit &amp; Integrity
           </button>
-
-          {role === 'DOCTOR' && isAuthenticated && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('doctor')}
-              className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
-                activeTab === 'doctor'
-                  ? 'bg-surface-card text-secondary border-t-2 border-secondary font-headline-sm'
-                  : 'text-secondary-fixed-dim hover:text-dicom-text-primary hover:bg-dicom-border/40'
-              }`}
-            >
-              <Stethoscope className="w-4 h-4" />
-              <span>Doctor Station</span>
-            </button>
-          )}
-
-          {role === 'PATIENT' && isAuthenticated && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('patient')}
-              className={`h-full flex items-center gap-1.5 px-space-md font-body-md text-body-md transition-colors ${
-                activeTab === 'patient'
-                  ? 'bg-surface-card text-status-verified border-t-2 border-status-verified font-headline-sm'
-                  : 'text-status-verified hover:text-dicom-text-primary hover:bg-dicom-border/40'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span>Patient Portal</span>
-            </button>
-          )}
         </nav>
 
-        {/* Right Status, User Profile & Actions */}
+        {/* Right Status & Attending Clinician Profile */}
         <div className="flex items-center gap-space-md">
-          <div className="hidden lg:flex items-center gap-space-sm border-r border-dicom-border pr-space-md font-label-sm text-label-sm">
+          <div className="hidden xl:flex items-center gap-space-sm border-r border-dicom-border pr-space-md font-label-sm text-label-sm">
             <div className="flex items-center gap-1 text-dicom-text-secondary">
               <span className="w-2 h-2 rounded-full bg-status-verified animate-pulse" />
-              <span>MST Synced</span>
+              <span>:4731 Synced</span>
             </div>
             <div className="flex items-center gap-1 text-dicom-text-secondary">
-              <span className="font-semibold text-secondary">DenseNet-121</span>
-              <span>Ready</span>
+              <span className="material-symbols-outlined text-[14px] text-secondary">memory</span>
+              <span>DenseNet-121 Ready</span>
             </div>
           </div>
 
-          {/* User Auth Info */}
-          {isAuthenticated ? (
-            <div className="flex items-center gap-space-sm">
-              <div className="text-right hidden sm:block">
-                <div className="font-headline-sm text-headline-sm text-dicom-text-primary leading-tight">
-                  {user?.full_name ? (role === 'DOCTOR' ? `Dr. ${user.full_name.replace(/^Dr\.\s*/i, '')}` : user.full_name) : user?.email}
-                </div>
-                <div className="font-label-sm text-label-sm text-dicom-text-secondary">
-                  {role === 'DOCTOR' ? (is_verified ? 'Verified Attending' : 'Verification Pending') : 'Patient Profile'}
-                </div>
+          <div className="flex items-center gap-space-sm">
+            <div className="text-right hidden sm:block">
+              <div className="font-headline-sm text-headline-sm text-dicom-text-primary leading-none">
+                {user?.full_name || 'Dr. Vivan, MD'}
               </div>
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center border border-dicom-border">
-                {role === 'DOCTOR' ? <Stethoscope className="w-4 h-4 text-secondary" /> : <User className="w-4 h-4 text-dicom-text-primary" />}
+              <div className="font-label-sm text-label-sm text-dicom-text-secondary mt-0.5">
+                Radiology Dept · Bay 3
               </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center border border-dicom-border">
+              <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
+            </div>
+            {isAuthenticated ? (
               <button
                 type="button"
                 onClick={logout}
                 title="Sign Out"
-                className="p-1 text-dicom-text-secondary hover:text-alert-tamper transition-colors"
+                className="p-1 text-dicom-text-secondary hover:text-alert-tamper transition-colors ml-1"
               >
-                <LogOut className="w-4 h-4" />
+                <span className="material-symbols-outlined text-[18px]">lock_reset</span>
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onOpenAuth('DOCTOR', 'login')}
-              className="px-space-md py-1 bg-secondary hover:bg-secondary/90 text-on-primary font-headline-sm text-xs rounded flex items-center gap-1.5 transition-colors shadow-sm"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </button>
-          )}
-
-          {/* Theme Toggle & Audit modal */}
-          <div className="flex items-center gap-1 pl-1">
-            <button
-              type="button"
-              onClick={onOpenAudit}
-              title="System Audit & Model Governance"
-              className="p-1.5 text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border rounded transition-colors"
-            >
-              <Info className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title="Toggle Clinical Theme"
-              className="p-1.5 text-dicom-text-secondary hover:text-dicom-text-primary hover:bg-dicom-border rounded transition-colors"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenAuth('DOCTOR', 'login')}
+                className="px-2 py-1 bg-secondary text-on-primary font-headline-sm text-xs rounded hover:bg-secondary/90 transition-colors ml-1"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile/Tablet Subnav Bar */}
-      <div className="xl:hidden flex items-center justify-around h-10 bg-dicom-surface border-b border-dicom-border overflow-x-auto text-xs px-space-sm">
+      {/* Mobile Nav Drawer Row */}
+      <div className="lg:hidden flex items-center justify-around h-9 bg-dicom-surface border-b border-dicom-border text-xs px-space-sm overflow-x-auto">
         <button
           type="button"
-          onClick={() => setActiveTab('single')}
-          className={`px-space-sm py-1 rounded font-medium ${activeTab === 'single' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          onClick={() => setActiveTab('screening')}
+          className={`px-space-sm py-1 font-medium ${activeTab === 'screening' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
         >
           Screening
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('access')}
-          className={`px-space-sm py-1 rounded font-medium ${activeTab === 'access' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-space-sm py-1 font-medium ${activeTab === 'access' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
         >
           Consents
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`px-space-sm py-1 rounded font-medium ${activeTab === 'history' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-space-sm py-1 font-medium ${activeTab === 'history' ? 'bg-surface-card text-text-primary' : 'text-dicom-text-secondary'}`}
         >
           Care Ledger
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('tamper')}
-          className={`px-space-sm py-1 rounded font-medium ${activeTab === 'tamper' ? 'bg-alert-tamper text-on-primary' : 'text-dicom-text-secondary'}`}
+          className={`px-space-sm py-1 font-medium ${activeTab === 'tamper' ? 'bg-surface-card text-alert-tamper' : 'text-dicom-text-secondary'}`}
         >
           Tamper Audit
         </button>
-        {role === 'DOCTOR' && isAuthenticated && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('doctor')}
-            className={`px-space-sm py-1 rounded font-medium ${activeTab === 'doctor' ? 'bg-surface-card text-secondary' : 'text-dicom-text-secondary'}`}
-          >
-            Doctor
-          </button>
-        )}
-        {role === 'PATIENT' && isAuthenticated && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('patient')}
-            className={`px-space-sm py-1 rounded font-medium ${activeTab === 'patient' ? 'bg-surface-card text-status-verified' : 'text-dicom-text-secondary'}`}
-          >
-            Patient
-          </button>
-        )}
       </div>
 
-      {/* Regulatory Notice Banner */}
+      {/* Regulatory Notice Banner (h-7) */}
       <div className="h-7 w-full bg-status-caution-bg border-b border-status-caution-border px-space-md flex items-center justify-between text-status-caution">
         <div className="flex items-center gap-space-xs font-label-md text-label-md truncate">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-status-caution" />
+          <span className="material-symbols-outlined text-[16px] shrink-0">warning</span>
           <span className="font-headline-sm text-headline-sm uppercase tracking-wider text-status-caution shrink-0">
             Regulatory Notice:
           </span>
@@ -282,7 +210,8 @@ export default function Header({
           </span>
         </div>
         <div className="hidden md:flex items-center gap-space-xs font-label-sm text-label-sm text-text-secondary shrink-0 pl-2">
-          <span>MST Protocol v1.0</span>
+          <span className="material-symbols-outlined text-[13px]">verified</span>
+          <span>MST Testnet Protocol</span>
         </div>
       </div>
     </header>

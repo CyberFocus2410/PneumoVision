@@ -1,68 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Header from './components/Header';
-import UploadPanel from './components/UploadPanel';
-import DicomViewer from './components/DicomViewer';
-import FindingsPanel from './components/FindingsPanel';
-import LongitudinalTab from './components/LongitudinalTab';
+import Footer from './components/Footer';
+import DiagnosticScreeningTab from './components/DiagnosticScreeningTab';
 import AccessControlTab from './components/AccessControlTab';
 import CareHistoryTab from './components/CareHistoryTab';
+import TamperAuditTab from './components/TamperAuditTab';
 import DoctorDashboard from './components/DoctorDashboard';
 import PatientDashboard from './components/PatientDashboard';
-import ReportModal from './components/ReportModal';
-import AuditDrawer from './components/AuditDrawer';
 import AuthModal from './components/AuthModal';
-import TamperAuditTab from './components/TamperAuditTab';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { fetchSystemHealth, fetchSamples, analyzeImage } from './api';
 
 function MainApp() {
   const { user, role, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState('single');
-  const [theme, setTheme] = useState('dark');
-  const [healthData, setHealthData] = useState(null);
-  const [samplesList, setSamplesList] = useState([]);
-  const [selectedSample, setSelectedSample] = useState('sample_pneumonia');
-  const [uploadedFileName, setUploadedFileName] = useState(null);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [selectedFinding, setSelectedFinding] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showAuditDrawer, setShowAuditDrawer] = useState(false);
+  const [activeTab, setActiveTab] = useState('screening');
 
   // Auth modal controls
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalRole, setAuthModalRole] = useState('DOCTOR');
   const [authModalMode, setAuthModalMode] = useState('login');
-
-  useEffect(() => {
-    if (role === 'PATIENT' && activeTab === 'doctor') {
-      setActiveTab('patient');
-    } else if (role === 'DOCTOR' && activeTab === 'patient') {
-      setActiveTab('doctor');
-    }
-  }, [role]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    fetchSystemHealth()
-      .then((data) => setHealthData(data))
-      .catch((err) => console.error('Health check failed:', err));
-
-    fetchSamples()
-      .then((data) => {
-        setSamplesList(data);
-        if (data.length > 0) {
-          handleSelectSample(data[0].id);
-        }
-      })
-      .catch((err) => {
-        console.error('Fetch samples error:', err);
-        handleSelectSample('sample_pneumonia');
-      });
-  }, []);
 
   const handleOpenAuth = (defaultRole = 'DOCTOR', defaultMode = 'login') => {
     setAuthModalRole(defaultRole);
@@ -70,128 +25,28 @@ function MainApp() {
     setShowAuthModal(true);
   };
 
-  const handleSelectSample = async (sampleId) => {
-    setSelectedSample(sampleId);
-    setUploadedFileName(null);
-    setIsAnalyzing(true);
-    try {
-      const data = await analyzeImage(sampleId);
-      setAnalysisResult(data);
-      setSelectedFinding(data.primary_finding !== 'No Finding' ? data.primary_finding : null);
-    } catch (e) {
-      console.error(e);
-      alert('Analysis error: ' + e.message);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleUploadFile = async (file) => {
-    setSelectedSample(null);
-    setUploadedFileName(file.name);
-    setIsAnalyzing(true);
-    try {
-      const data = await analyzeImage(file);
-      setAnalysisResult(data);
-      setSelectedFinding(data.primary_finding !== 'No Finding' ? data.primary_finding : null);
-    } catch (e) {
-      console.error(e);
-      alert('Upload analysis error: ' + e.message);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   return (
-    <div className="app-container pt-[85px] bg-surface-base">
+    <div className="min-h-screen flex flex-col bg-surface-base font-body-md text-text-primary antialiased">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        healthData={healthData}
-        theme={theme}
-        setTheme={setTheme}
-        onOpenAudit={() => setShowAuditDrawer(true)}
         onOpenAuth={handleOpenAuth}
       />
 
-      {activeTab === 'single' && (
-        <main className="pacs-workspace-grid">
-          {/* Left Column: Patient Worklist & Acquisition */}
-          <UploadPanel
-            samples={samplesList}
-            onSelectSample={handleSelectSample}
-            onUploadFile={handleUploadFile}
-            selectedSample={selectedSample}
-            uploadedFileName={uploadedFileName}
-            isAnalyzing={isAnalyzing}
-            dicomMetadata={analysisResult?.dicom_metadata}
-            qualityMetrics={analysisResult?.quality_metrics}
-          />
+      <main className="w-full min-h-[calc(100vh-120px)] bg-surface-base flex-1">
+        {(activeTab === 'screening' || activeTab === 'single') && (
+          <DiagnosticScreeningTab onCommitLedger={() => setActiveTab('history')} />
+        )}
+        {activeTab === 'access' && <AccessControlTab />}
+        {activeTab === 'history' && <CareHistoryTab />}
+        {activeTab === 'tamper' && (
+          <TamperAuditTab onNavigateSafe={() => setActiveTab('screening')} />
+        )}
+        {activeTab === 'doctor' && <DoctorDashboard />}
+        {activeTab === 'patient' && <PatientDashboard />}
+      </main>
 
-          {/* Center Column: Multi-View Radiologist Viewport */}
-          <DicomViewer
-            analysisResult={analysisResult}
-            selectedFinding={selectedFinding}
-            setSelectedFinding={setSelectedFinding}
-            isAnalyzing={isAnalyzing}
-          />
-
-          {/* Right Column: Dual-Mode Intelligence Panel (Patient vs Clinician) */}
-          <FindingsPanel
-            analysisResult={analysisResult}
-            selectedFinding={selectedFinding}
-            setSelectedFinding={setSelectedFinding}
-            onOpenReport={() => setShowReportModal(true)}
-          />
-        </main>
-      )}
-
-      {activeTab === 'doctor' && (
-        <DoctorDashboard />
-      )}
-
-      {activeTab === 'patient' && (
-        <PatientDashboard />
-      )}
-
-      {activeTab === 'longitudinal' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <LongitudinalTab />
-        </div>
-      )}
-
-      {activeTab === 'access' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <AccessControlTab />
-        </div>
-      )}
-
-      {activeTab === 'history' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <CareHistoryTab />
-        </div>
-      )}
-
-      {activeTab === 'tamper' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <TamperAuditTab onNavigateSafe={() => setActiveTab('single')} />
-        </div>
-      )}
-
-      {/* Dual-Mode Report Modal */}
-      {showReportModal && (
-        <ReportModal
-          analysisResult={analysisResult}
-          onClose={() => setShowReportModal(false)}
-        />
-      )}
-
-      {/* Governance & Audit Drawer */}
-      <AuditDrawer
-        isOpen={showAuditDrawer}
-        onClose={() => setShowAuditDrawer(false)}
-        healthData={healthData}
-      />
+      <Footer />
 
       {/* Login / Signup Modal */}
       <AuthModal
@@ -211,5 +66,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
-
