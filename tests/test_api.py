@@ -6,6 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
 
+from src.config import TARGET_CLASSES
+
 client = TestClient(app)
 
 def test_health_endpoint():
@@ -14,7 +16,7 @@ def test_health_endpoint():
     data = response.json()
     assert data["status"] == "healthy"
     assert "target_classes" in data
-    assert len(data["target_classes"]) == 5
+    assert len(data["target_classes"]) == len(TARGET_CLASSES)
 
 def test_analyze_sample():
     response = client.post("/v1/analyze", data={"sample_id": "sample_normal"})
@@ -23,7 +25,7 @@ def test_analyze_sample():
     assert "case_id" in data
     assert "predictions" in data
     assert "primary_finding" in data
-    assert len(data["predictions"]) == 5
+    assert len(data["predictions"]) == len(TARGET_CLASSES)
 
 def test_compare_samples():
     response = client.post(
@@ -33,7 +35,7 @@ def test_compare_samples():
     assert response.status_code == 200
     data = response.json()
     assert "findings_comparison" in data
-    assert len(data["findings_comparison"]) == 5
+    assert len(data["findings_comparison"]) == len(TARGET_CLASSES)
 
 def test_feedback_logging():
     payload = {
@@ -45,3 +47,4 @@ def test_feedback_logging():
     response = client.post("/v1/feedback", json=payload)
     assert response.status_code == 200
     assert response.json()["status"] == "success"
+

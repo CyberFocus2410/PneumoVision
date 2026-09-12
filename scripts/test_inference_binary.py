@@ -1,10 +1,14 @@
-"""
-Quick verification script for PneumoInferenceEngine & Grad-CAM on binary checkpoint.
-"""
+import sys
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent if Path(__file__).resolve().parent.name == "scripts" else Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import torch
 from src.inference.engine import PneumoInferenceEngine
 from PIL import Image
+
 
 def main():
     print("=== Testing PneumoInferenceEngine Binary Mode ===")

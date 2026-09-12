@@ -1,14 +1,36 @@
 # PneumoVision Multi-Dataset Label Harmonization Taxonomy
 # Explicit mapping between target findings and source dataset annotations
 
+modes:
+  binary:
+    target_taxonomy:
+      - Pneumonia
+      - No Finding
+    model_outputs:
+      - Pneumonia
+  multilabel:
+    target_taxonomy:
+      - Pneumonia
+      - Cardiomegaly
+      - Pleural Effusion
+      - Atelectasis
+      - No Finding
+    model_outputs:
+      - Pneumonia
+      - Cardiomegaly
+      - Pleural Effusion
+      - Atelectasis
+      - No Finding
+
 target_taxonomy:
   - Pneumonia
-  - Cardiomegaly
-  - Pleural Effusion
-  - Atelectasis
   - No Finding
 
 datasets:
+  kaggle_chest_xray:
+    Pneumonia: "PNEUMONIA"
+    No Finding: "NORMAL"
+
   nih_chestxray14:
     Pneumonia: "Pneumonia"
     Cardiomegaly: "Cardiomegaly"
@@ -30,3 +52,4 @@ datasets:
     Pleural Effusion: "Pleural Effusion"
     Atelectasis: "Atelectasis"
     No Finding: "No Finding"
+
