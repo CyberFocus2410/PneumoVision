@@ -2,8 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
 
 # Distribution / packaging
@@ -25,57 +23,59 @@ share/python-wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environments
+# Virtual Environments & Caches
 .env
 .venv
 env/
 venv/
 ENV/
-
-# Jupyter Notebook checkpoints
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
 .ipynb_checkpoints
 
-# Node / Vite / Hardhat
+# Node / Vite / Frontend / Hardhat
 node_modules/
 frontend/node_modules/
 frontend/dist/
-dist/
 .vite/
 blockchain/artifacts/
 blockchain/cache/
 
-
-# Large training data (exclude full NIH gigabytes, keep sample demo data)
+# Large Datasets & Archives
+data/chest_xray/
 data/raw/*
 !data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
 data/raw_cohort/*
 !data/raw_cohort/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 
-# Checkpoint binaries (can be regenerated or hosted on releases)
+# Checkpoint binaries & Weights (metadata JSON preserved)
 *.pt
 *.pth
 !models/checkpoints/model_metadata.json
 !models/checkpoints/.gitkeep
 
-# IDEs and OS files
+# IDEs, OS & Log files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 *.log
 
-# Runtime generated static files
+# Runtime generated static artifacts
 backend/static/heatmaps/*.png
 !backend/static/heatmaps/.gitkeep
 backend/static/reports/*.pdf
 !backend/static/reports/.gitkeep
 
-# Kaggle credentials and staging
+# Kaggle credentials & ephemeral staging
 kaggle.json
 .kaggle_staging/
 models/kaggle_output/
-# Runtime generated records & audits
+
+# Runtime generated database & audit logs
 data/records_db/
 data/feedback_audit_log.jsonl
