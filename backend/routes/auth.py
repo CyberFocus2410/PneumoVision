@@ -84,7 +84,7 @@ async def patient_signup(payload: PatientSignupRequest, db: Session = Depends(ge
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Ethereum wallet address format."
+                detail="Invalid MST Testnet wallet address format."
             )
 
     # Generate pseudonymous patientId (hash-based, zero PII derivable)
@@ -183,7 +183,7 @@ async def doctor_signup(payload: DoctorSignupRequest, db: Session = Depends(get_
     if not Web3.is_address(payload.wallet_address):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Ethereum wallet address format."
+            detail="Invalid MST Testnet wallet address format."
         )
 
     wallet = Web3.to_checksum_address(payload.wallet_address)
@@ -283,13 +283,13 @@ async def update_patient_wallet(
     db: Session = Depends(get_db)
 ):
     """
-    Links or updates the authenticated patient's Ethereum wallet address post-signup
+    Links or updates the authenticated patient's MST Testnet wallet address post-signup
     for BridgeKey cryptographic signatures.
     """
     if not Web3.is_address(payload.wallet_address):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Ethereum wallet address format."
+            detail="Invalid MST Testnet wallet address format."
         )
     
     checksummed_wallet = Web3.to_checksum_address(payload.wallet_address)

@@ -330,7 +330,7 @@ export default function DoctorDashboard() {
               Physician Credentials Pending Administrative Approval
             </div>
             <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
-              Your account has been registered, but your Ethereum wallet address (<code>{user?.wallet_address}</code>) has not yet received an on-chain <code>authorizeProvider</code> transaction from the hospital administrator.
+              Your account has been registered, but your MST Testnet wallet address (<code>{user?.wallet_address}</code>) has not yet received an on-chain <code>authorizeProvider</code> transaction from the hospital administrator.
               <strong> Diagnostic view and radiograph inspection are available, but medical data-entry actions (Treatment, Medication, Outcome) remain locked until authorization is granted.</strong>
             </p>
           </div>

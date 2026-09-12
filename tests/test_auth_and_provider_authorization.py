@@ -324,7 +324,7 @@ def test_full_chain_security_and_consent_enforcement_with_local_dev_mode_off(cli
     pat2_id = pat2_res.json()["user"]["patient_id"]
 
     # Step C: Onboard Doctor (is_verified = False)
-    doc_wallet = bc_client.accounts[5] if len(bc_client.accounts) > 5 else bc_client.admin_account
+    doc_wallet = bc_client.accounts[5] if len(bc_client.accounts) > 5 else bc_client.w3.eth.account.create().address
     doc_res = client.post("/v1/auth/doctor/signup", json={
         "email": f"doctor_chain_{uid}@pneumovision.ai",
         "password": "DocPassword123!",

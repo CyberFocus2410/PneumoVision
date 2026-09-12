@@ -96,18 +96,20 @@ class PatientRecordsClient:
                 self.accounts.insert(0, self.signer_account.address)
             self.default_account = self.signer_account.address
             self.admin_account = self.signer_account.address
+            self.default_doctor = os.environ.get("DOCTOR_WALLET_ADDRESS", self.signer_account.address)
         elif not self.accounts:
             # Generate local dev account if needed
             acct = self.w3.eth.account.create()
             self.accounts = [acct.address]
             self.default_account = acct.address
             self.admin_account = acct.address
+            self.default_doctor = acct.address
         else:
             self.default_account = self.accounts[0]
             self.admin_account = self.accounts[0]
+            self.default_doctor = self.accounts[1] if len(self.accounts) > 1 else self.default_account
 
         self.w3.eth.default_account = self.default_account
-        self.default_doctor = self.accounts[1] if len(self.accounts) > 1 else self.default_account
         self.default_patient = self.accounts[2] if len(self.accounts) > 2 else self.default_account
 
         # 4. Bind or Deploy Contract
@@ -123,7 +125,7 @@ class PatientRecordsClient:
         """Sends a transaction either via unlocked local RPC account or locally signed raw transaction."""
         sender_addr = sender or self.default_account
         if self.signer_account and (self.signer_account.address.lower() == sender_addr.lower() or not hasattr(self.w3.eth, "accounts") or not self.w3.eth.accounts or sender_addr not in self.w3.eth.accounts):
-            nonce = self.w3.eth.get_transaction_count(self.signer_account.address)
+            nonce = self.w3.eth.get_transaction_count(self.signer_account.address, "pending")
             gas_price = self.w3.eth.gas_price
             chain_id = self.w3.eth.chain_id
             tx_data = func_or_constructor.build_transaction({
@@ -139,7 +141,22 @@ class PatientRecordsClient:
                 tx_data["gas"] = 3000000
             signed = self.signer_account.sign_transaction(tx_data)
             tx_raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
-            tx_hash = self.w3.eth.send_raw_transaction(tx_raw)
+            try:
+                tx_hash = self.w3.eth.send_raw_transaction(tx_raw)
+            except ValueError as val_err:
+                err_msg = str(val_err)
+                if "nonce too low" in err_msg or "-32000" in err_msg:
+                    import re
+                    match = re.search(r'next nonce (\d+)', err_msg)
+                    if match:
+                        tx_data["nonce"] = int(match.group(1))
+                    else:
+                        tx_data["nonce"] = self.w3.eth.get_transaction_count(self.signer_account.address, "pending") + 1
+                    signed = self.signer_account.sign_transaction(tx_data)
+                    tx_raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+                    tx_hash = self.w3.eth.send_raw_transaction(tx_raw)
+                else:
+                    raise
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
             return tx_hash, receipt
 

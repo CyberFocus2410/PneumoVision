@@ -30,7 +30,7 @@ router = APIRouter(tags=["Blockchain & Care Timeline"])
 
 class ConsentRequest(BaseModel):
     patient_id: str = Field(..., description="Pseudonymous patient identifier")
-    provider_address: str = Field(..., description="Ethereum address of hospital or doctor")
+    provider_address: str = Field(..., description="MST Testnet address of hospital or doctor")
     caller_address: Optional[str] = Field(None, description="Wallet address of the patient (defaults to authenticated patient)")
 
 
@@ -38,7 +38,7 @@ class TreatmentRecordRequest(BaseModel):
     treatment_description: str = Field(..., description="Description of treatment or clinical protocol administered")
     diagnosis_ref: Optional[str] = Field(None, description="Linked Diagnosis record reference or case ID")
     treatment_type: Optional[str] = Field("Clinical Protocol", description="Category or modality of treatment")
-    provider_address: Optional[str] = Field(None, description="Provider Ethereum address executing the record")
+    provider_address: Optional[str] = Field(None, description="Provider MST Testnet address executing the record")
     notes: Optional[str] = Field(None, description="Clinical notes and observations")
 
 
@@ -521,7 +521,7 @@ async def get_my_patient_records(
 @router.get("/v1/records/{patient_id}")
 async def get_patient_records(
     patient_id: str,
-    caller_address: Optional[str] = Query(None, description="Ethereum address of caller requesting access"),
+    caller_address: Optional[str] = Query(None, description="MST Testnet address of caller requesting access"),
     current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """

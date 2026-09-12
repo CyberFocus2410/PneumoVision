@@ -365,14 +365,14 @@ export default function AuthModal({ isOpen, onClose, initialRole = 'DOCTOR', ini
               <>
                 <div>
                   <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    Ethereum Wallet Address (Required for On-Chain Signatures)
+                    MST Testnet Wallet Address (Required for On-Chain Signatures)
                   </label>
                   <div style={{ position: 'relative' }}>
                     <Wallet size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
                     <input
                       type="text"
                       required
-                      placeholder="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                      placeholder="0xb3C09303335393D511F9eE1C7Bf4f1154904142b"
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
                       style={{

@@ -25,15 +25,15 @@ from backend.routes.providers import router as providers_router
 
 
 def seed_default_admin():
-    """Initializes default admin account if not already present."""
+    """Initializes default admin and verified doctor accounts on MST Testnet."""
     init_db()
     db = SessionLocal()
     try:
+        client = get_blockchain_client()
         admin_email = os.environ.get("ADMIN_EMAIL", "admin@pneumovision.ai")
         admin_pwd = os.environ.get("ADMIN_PASSWORD", "AdminPassword2026!")
         admin_user = db.query(User).filter(User.email == admin_email).first()
         if not admin_user:
-            client = get_blockchain_client()
             admin = User(
                 email=admin_email,
                 hashed_password=hash_password(admin_pwd),
@@ -43,7 +43,35 @@ def seed_default_admin():
                 is_verified=True
             )
             db.add(admin)
-            db.commit()
+        elif client.signer_account and admin_user.wallet_address != client.admin_account:
+            admin_user.wallet_address = client.admin_account
+            admin_user.is_verified = True
+
+        # Verified Doctor account with MST Testnet wallet for clinical/medical usage
+        doctor_email = os.environ.get("DOCTOR_EMAIL", "doctor@pneumovision.ai")
+        doctor_pwd = os.environ.get("DOCTOR_PASSWORD", "DoctorPassword2026!")
+        doctor_user = db.query(User).filter(User.email == doctor_email).first()
+        mst_doctor_wallet = client.default_doctor or client.admin_account
+
+        if not doctor_user:
+            doc = User(
+                email=doctor_email,
+                hashed_password=hash_password(doctor_pwd),
+                role=UserRole.DOCTOR.value,
+                full_name="Dr. Vivan (MST Certified Radiologist)",
+                wallet_address=mst_doctor_wallet,
+                medical_license="MST-MD-91562037",
+                hospital_affiliation="MST Radiological Center",
+                is_verified=True
+            )
+            db.add(doc)
+        else:
+            doctor_user.wallet_address = mst_doctor_wallet
+            doctor_user.is_verified = True
+            doctor_user.full_name = "Dr. Vivan (MST Certified Radiologist)"
+            doctor_user.hospital_affiliation = "MST Radiological Center"
+
+        db.commit()
     finally:
         db.close()
 

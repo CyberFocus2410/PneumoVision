@@ -11,7 +11,8 @@ Verifies:
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from backend.main import app
+from backend.main import app, seed_default_admin
+from backend.db.database import init_db
 from backend.blockchain.client import get_blockchain_client
 from backend.blockchain.store import (
     load_offchain_record,
@@ -19,6 +20,12 @@ from backend.blockchain.store import (
     compute_content_hash,
     verify_record_integrity
 )
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_environment():
+    init_db()
+    seed_default_admin()
+    yield
 
 client = TestClient(app)
 

@@ -4,9 +4,8 @@ import { grantConsent, revokeConsent, fetchVerifiedProviders } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_PROVIDERS = [
-  { name: 'St. Jude Childrens Research Hospital', address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', role: 'Pediatric Pulmonology' },
-  { name: 'Johns Hopkins Imaging Center', address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', role: 'Radiology / Diagnostic' },
-  { name: 'Mayo Clinic Health System', address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', role: 'Inpatient Clinical Care' }
+  { name: 'Dr. Vivan (MST Certified Radiologist)', address: '0xb3C09303335393D511F9eE1C7Bf4f1154904142b', role: 'MST Testnet Medical Officer' },
+  { name: 'PneumoVision Clinical Center (MST Testnet)', address: '0xb3C09303335393D511F9eE1C7Bf4f1154904142b', role: 'Radiology / Diagnostic Hub' }
 ];
 
 export default function AccessControlTab() {
@@ -18,8 +17,8 @@ export default function AccessControlTab() {
   const [activeGrants, setActiveGrants] = useState([
     {
       patientId: patient_id || 'PATIENT_FULL_CARE_TIMELINE_04',
-      providerName: 'St. Jude Childrens Research Hospital',
-      providerAddress: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
+      providerName: 'Dr. Vivan (MST Certified Radiologist)',
+      providerAddress: '0xb3C09303335393D511F9eE1C7Bf4f1154904142b',
       grantedAt: new Date().toLocaleTimeString(),
       status: 'ACTIVE'
     }
@@ -222,7 +221,7 @@ export default function AccessControlTab() {
 
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Custom Provider Ethereum Address
+                Custom Provider MST Testnet Address
               </label>
               <input
                 type="text"
@@ -233,7 +232,7 @@ export default function AccessControlTab() {
                   setProviderAddress(e.target.value);
                   setProviderName('Custom Address');
                 }}
-                placeholder="0x..."
+                placeholder="0xb3C09303335393D511F9eE1C7Bf4f1154904142b"
               />
             </div>
 

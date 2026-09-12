@@ -205,7 +205,7 @@ export default function PatientDashboard() {
       await refreshUser();
       setWalletFeedback({
         type: 'success',
-        message: 'Ethereum wallet address linked successfully for BridgeKey cryptographic signatures.'
+        message: 'MST Testnet wallet address linked successfully for BridgeKey cryptographic signatures.'
       });
     } catch (err) {
       setWalletFeedback({
@@ -312,7 +312,7 @@ export default function PatientDashboard() {
               CRITICAL AUDIT ALERT: CRYPTOGRAPHIC HASH MISMATCH DETECTED
             </div>
             <p style={{ fontSize: '0.78rem', color: '#fca5a5', marginTop: '4px', lineHeight: '1.45' }}>
-              One or more medical record payloads in off-chain storage have been altered and no longer match the immutable cryptographic hash digest committed on the Ethereum smart contract (<code>PatientRecords.sol</code>). The affected records below are flagged with a security warning.
+              One or more medical record payloads in off-chain storage have been altered and no longer match the immutable cryptographic hash digest committed on the MST Testnet smart contract (<code>PatientRecords.sol</code>). The affected records below are flagged with a security warning.
             </p>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function PatientDashboard() {
           {isLoadingRecords ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
               <RefreshCw size={24} className="status-dot" style={{ margin: '0 auto 10px auto' }} />
-              Verifying cryptographic hash digests against Ethereum blockchain...
+              Verifying cryptographic hash digests against MST Testnet blockchain...
             </div>
           ) : timelineData?.records?.length === 0 ? (
             <div style={{
@@ -599,7 +599,7 @@ export default function PatientDashboard() {
                 gap: '4px'
               }}>
                 <div style={{ fontWeight: 700, color: 'var(--cyan-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Award size={13} /> Verified On-Chain Ethereum Address:
+                  <Award size={13} /> Verified On-Chain MST Testnet Address:
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
                   {selectedProviderAddr}
@@ -616,7 +616,7 @@ export default function PatientDashboard() {
             >
               {isConsentLoading ? (
                 <>
-                  <RefreshCw size={14} className="status-dot" /> Authorizing on Ethereum Smart Contract...
+                  <RefreshCw size={14} className="status-dot" /> Authorizing on MST Testnet Smart Contract...
                 </>
               ) : (
                 <>
@@ -691,12 +691,12 @@ export default function PatientDashboard() {
       {activeTab === 'wallet' && (
         <div style={{ background: 'var(--bg-sidebar)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '20px', maxWidth: '640px' }}>
           <div className="panel-header-title">
-            <span>Link Ethereum Wallet (BridgeKey Cryptographic Signing)</span>
+            <span>Link MST Testnet Wallet (BridgeKey Cryptographic Signing)</span>
             <Wallet size={14} color="var(--cyan-primary)" />
           </div>
 
           <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: '1.45' }}>
-            Linking an Ethereum wallet address enables decentralized BridgeKey signing, allowing you to sign consent transactions directly from your browser wallet.
+            Linking an MST Testnet wallet address enables decentralized BridgeKey signing, allowing you to sign consent transactions directly from your browser wallet.
           </p>
 
           {walletFeedback && (
@@ -716,12 +716,12 @@ export default function PatientDashboard() {
           <form onSubmit={handleUpdateWallet} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                Ethereum Wallet Address
+                MST Testnet Wallet Address
               </label>
               <input
                 type="text"
                 required
-                placeholder="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                placeholder="0xb3C09303335393D511F9eE1C7Bf4f1154904142b"
                 value={newWalletInput}
                 onChange={(e) => setNewWalletInput(e.target.value)}
                 style={{

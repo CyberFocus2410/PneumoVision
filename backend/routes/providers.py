@@ -19,7 +19,7 @@ router = APIRouter(tags=["Healthcare Providers & Administration"])
 class AuthorizeProviderRequest(BaseModel):
     doctor_id: Optional[int] = Field(None, description="Database User ID of the doctor")
     doctor_email: Optional[str] = Field(None, description="Email address of the doctor")
-    provider_address: Optional[str] = Field(None, description="Doctor's Ethereum wallet address")
+    provider_address: Optional[str] = Field(None, description="Doctor's MST Testnet wallet address")
     provider_name: Optional[str] = Field(None, description="Name or affiliation for on-chain identity")
 
 
@@ -99,11 +99,31 @@ async def list_verified_providers(db: Session = Depends(get_db)):
     """
     Returns directory of verified doctors and hospitals.
     Allows patients and staff to select verified providers without typing raw hex addresses.
+    Prioritizes active MST Testnet providers.
     """
     doctors = db.query(User).filter(
         User.role == UserRole.DOCTOR.value,
         User.is_verified == True  # noqa: E712
-    ).all()
+    ).order_by(User.id.desc()).all()
+
+    client = get_blockchain_client()
+    primary_addr = (client.default_doctor or client.admin_account or "").lower()
+
+    seen_wallets = set()
+    unique_doctors = []
+    for doc in doctors:
+        if not doc.wallet_address:
+            continue
+        norm_wallet = doc.wallet_address.lower()
+        if norm_wallet in seen_wallets:
+            continue
+        seen_wallets.add(norm_wallet)
+        unique_doctors.append(doc)
+
+    # Sort with primary MST Testnet wallet first
+    unique_doctors.sort(
+        key=lambda d: 0 if (d.wallet_address and d.wallet_address.lower() == primary_addr) else 1
+    )
 
     return [
         ProviderItem(
@@ -115,5 +135,5 @@ async def list_verified_providers(db: Session = Depends(get_db)):
             hospital_affiliation=doc.hospital_affiliation,
             is_verified=doc.is_verified
         )
-        for doc in doctors
+        for doc in unique_doctors
     ]
