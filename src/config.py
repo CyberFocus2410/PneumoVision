@@ -28,35 +28,33 @@ for p in [DATA_DIR, CHECKPOINTS_DIR, STATIC_DIR, HEATMAPS_DIR, REPORTS_DIR, SAMP
 # -----------------------------------------------------------------------------
 LABEL_MODE = os.environ.get("PNEUMOVISION_LABEL_MODE", "binary").lower()
 
-# 1. Binary Taxonomy (Kaggle Pneumonia Screener)
-BINARY_TARGET_CLASSES: List[str] = [
-    "Pneumonia",
-    "No Finding",
-]
-BINARY_MODEL_OUTPUT_CLASSES: List[str] = [
-    "Pneumonia",
-]
-BINARY_DEFAULT_THRESHOLDS: Dict[str, float] = {
-    "Pneumonia": 0.51,
-    "No Finding": 0.49,
-}
-
-# 2. Multi-Label Taxonomy (NIH ChestX-ray14 5 findings)
-MULTILABEL_TARGET_CLASSES: List[str] = [
+# 1. Target Taxonomy for Screening & Differential Report
+TARGET_CLASSES: List[str] = [
     "Pneumonia",
     "Cardiomegaly",
     "Pleural Effusion",
     "Atelectasis",
     "No Finding",
 ]
-MULTILABEL_MODEL_OUTPUT_CLASSES: List[str] = MULTILABEL_TARGET_CLASSES
-MULTILABEL_DEFAULT_THRESHOLDS: Dict[str, float] = {
-    "Pneumonia": 0.42,
+MODEL_OUTPUT_CLASSES: List[str] = [
+    "Pneumonia",
+]
+DEFAULT_THRESHOLDS: Dict[str, float] = {
+    "Pneumonia": 0.51,
     "Cardiomegaly": 0.40,
     "Pleural Effusion": 0.42,
     "Atelectasis": 0.39,
-    "No Finding": 0.41,
+    "No Finding": 0.49,
 }
+
+# Aliases for backward compatibility
+BINARY_TARGET_CLASSES = TARGET_CLASSES
+BINARY_MODEL_OUTPUT_CLASSES = MODEL_OUTPUT_CLASSES
+BINARY_DEFAULT_THRESHOLDS = DEFAULT_THRESHOLDS
+MULTILABEL_TARGET_CLASSES = TARGET_CLASSES
+MULTILABEL_MODEL_OUTPUT_CLASSES = TARGET_CLASSES
+MULTILABEL_DEFAULT_THRESHOLDS = DEFAULT_THRESHOLDS
+
 
 
 def get_target_classes(mode: Optional[str] = None) -> List[str]:
