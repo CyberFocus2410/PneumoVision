@@ -15,14 +15,17 @@ import {
   Clock,
   ArrowDown,
   Hash,
-  Link2
+  Link2,
+  Lock
 } from 'lucide-react';
 import {
   fetchPatientRecords,
+  fetchMyRecords,
   addTreatmentRecord,
   addMedicationRecord,
   addOutcomeRecord
 } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const RECORD_ICONS = {
   Diagnosis: <Stethoscope size={18} color="var(--cyan-primary)" />,
@@ -32,8 +35,11 @@ const RECORD_ICONS = {
 };
 
 export default function CareHistoryTab() {
-  const [patientId, setPatientId] = useState('PATIENT_FULL_CARE_TIMELINE_04');
-  const [callerAddress, setCallerAddress] = useState('');
+  const { user, role, patient_id, wallet_address } = useAuth();
+  const isPatientUser = role === 'PATIENT';
+
+  const [patientId, setPatientId] = useState(patient_id || 'PATIENT_FULL_CARE_TIMELINE_04');
+  const [callerAddress, setCallerAddress] = useState(wallet_address || '');
   const [timelineData, setTimelineData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -50,15 +56,25 @@ export default function CareHistoryTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadTimeline();
-  }, []);
+    if (isPatientUser && patient_id) {
+      setPatientId(patient_id);
+      loadTimeline(patient_id, wallet_address);
+    } else {
+      loadTimeline();
+    }
+  }, [patient_id, isPatientUser]);
 
   const loadTimeline = async (pid = patientId, caller = callerAddress) => {
-    if (!pid) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchPatientRecords(pid, caller || null);
+      let data;
+      if (isPatientUser) {
+        data = await fetchMyRecords();
+      } else {
+        if (!pid) return;
+        data = await fetchPatientRecords(pid, caller || null);
+      }
       setTimelineData(data);
     } catch (e) {
       setError(e.message);
@@ -67,6 +83,7 @@ export default function CareHistoryTab() {
       setIsLoading(false);
     }
   };
+
 
   const handleCreateRecord = async (e) => {
     e.preventDefault();

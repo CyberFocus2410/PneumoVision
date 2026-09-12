@@ -55,22 +55,35 @@ export default function Header({ activeTab, setActiveTab, healthData, theme, set
             <Layers size={14} /> Single Study
           </button>
           
-          <button
-            className={`nav-tab-btn ${activeTab === 'doctor' ? 'active' : ''}`}
-            onClick={() => {
-              if (!isAuthenticated) {
-                onOpenAuth('DOCTOR', 'login');
-              } else {
-                setActiveTab('doctor');
-              }
-            }}
-            style={{
-              borderColor: activeTab === 'doctor' ? 'var(--cyan-primary)' : undefined,
-              color: activeTab === 'doctor' ? 'var(--cyan-primary)' : undefined
-            }}
-          >
-            <Stethoscope size={14} /> Doctor Station
-          </button>
+          {role === 'PATIENT' ? (
+            <button
+              className={`nav-tab-btn ${activeTab === 'patient' ? 'active' : ''}`}
+              onClick={() => setActiveTab('patient')}
+              style={{
+                borderColor: activeTab === 'patient' ? 'var(--emerald-success)' : undefined,
+                color: activeTab === 'patient' ? 'var(--emerald-success)' : undefined
+              }}
+            >
+              <User size={14} /> My Health Portal
+            </button>
+          ) : (
+            <button
+              className={`nav-tab-btn ${activeTab === 'doctor' ? 'active' : ''}`}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  onOpenAuth('DOCTOR', 'login');
+                } else {
+                  setActiveTab('doctor');
+                }
+              }}
+              style={{
+                borderColor: activeTab === 'doctor' ? 'var(--cyan-primary)' : undefined,
+                color: activeTab === 'doctor' ? 'var(--cyan-primary)' : undefined
+              }}
+            >
+              <Stethoscope size={14} /> Doctor Station
+            </button>
+          )}
 
           <button
             className={`nav-tab-btn ${activeTab === 'longitudinal' ? 'active' : ''}`}

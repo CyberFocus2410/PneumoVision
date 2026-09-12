@@ -148,6 +148,17 @@ export async function revokeConsent({ patientId, providerAddress, callerAddress 
   return res.json();
 }
 
+export async function fetchMyRecords() {
+  const res = await fetch(`${API_BASE}/me/records`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to retrieve your patient records' }));
+    throw new Error(err.detail || 'Failed to retrieve your patient records');
+  }
+  return res.json();
+}
+
 export async function fetchPatientRecords(patientId, callerAddress = null) {
   let url = `${API_BASE}/records/${encodeURIComponent(patientId)}`;
   if (callerAddress) {

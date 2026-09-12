@@ -362,6 +362,27 @@ async def add_outcome_record(
         )
 
 
+@router.get("/me/records")
+@router.get("/v1/me/records")
+@router.get("/v1/records/me")
+async def get_my_patient_records(
+    current_patient: User = Depends(require_patient)
+):
+    """
+    Retrieves full chronological, hash-verified care timeline for the currently
+    authenticated patient. Patient ID is derived strictly server-side from the auth token.
+    """
+    if not current_patient.patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No on-chain patient identity linked to this patient account."
+        )
+    return await get_patient_records(
+        patient_id=current_patient.patient_id,
+        caller_address=current_patient.wallet_address
+    )
+
+
 @router.get("/records/{patient_id}")
 @router.get("/v1/records/{patient_id}")
 async def get_patient_records(

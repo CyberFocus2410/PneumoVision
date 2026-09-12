@@ -7,6 +7,7 @@ import LongitudinalTab from './components/LongitudinalTab';
 import AccessControlTab from './components/AccessControlTab';
 import CareHistoryTab from './components/CareHistoryTab';
 import DoctorDashboard from './components/DoctorDashboard';
+import PatientDashboard from './components/PatientDashboard';
 import ReportModal from './components/ReportModal';
 import AuditDrawer from './components/AuditDrawer';
 import AuthModal from './components/AuthModal';
@@ -31,6 +32,14 @@ function MainApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalRole, setAuthModalRole] = useState('DOCTOR');
   const [authModalMode, setAuthModalMode] = useState('login');
+
+  useEffect(() => {
+    if (role === 'PATIENT' && activeTab === 'doctor') {
+      setActiveTab('patient');
+    } else if (role === 'DOCTOR' && activeTab === 'patient') {
+      setActiveTab('doctor');
+    }
+  }, [role]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -138,6 +147,10 @@ function MainApp() {
 
       {activeTab === 'doctor' && (
         <DoctorDashboard />
+      )}
+
+      {activeTab === 'patient' && (
+        <PatientDashboard />
       )}
 
       {activeTab === 'longitudinal' && (
