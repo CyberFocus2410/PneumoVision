@@ -6,11 +6,15 @@ import FindingsPanel from './components/FindingsPanel';
 import LongitudinalTab from './components/LongitudinalTab';
 import AccessControlTab from './components/AccessControlTab';
 import CareHistoryTab from './components/CareHistoryTab';
+import DoctorDashboard from './components/DoctorDashboard';
 import ReportModal from './components/ReportModal';
 import AuditDrawer from './components/AuditDrawer';
+import AuthModal from './components/AuthModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { fetchSystemHealth, fetchSamples, analyzeImage } from './api';
 
-export default function App() {
+function MainApp() {
+  const { user, role, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('single');
   const [theme, setTheme] = useState('dark');
   const [healthData, setHealthData] = useState(null);
@@ -22,6 +26,11 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showAuditDrawer, setShowAuditDrawer] = useState(false);
+
+  // Auth modal controls
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalRole, setAuthModalRole] = useState('DOCTOR');
+  const [authModalMode, setAuthModalMode] = useState('login');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -44,6 +53,12 @@ export default function App() {
         handleSelectSample('sample_pneumonia');
       });
   }, []);
+
+  const handleOpenAuth = (defaultRole = 'DOCTOR', defaultMode = 'login') => {
+    setAuthModalRole(defaultRole);
+    setAuthModalMode(defaultMode);
+    setShowAuthModal(true);
+  };
 
   const handleSelectSample = async (sampleId) => {
     setSelectedSample(sampleId);
@@ -86,6 +101,7 @@ export default function App() {
         theme={theme}
         setTheme={setTheme}
         onOpenAudit={() => setShowAuditDrawer(true)}
+        onOpenAuth={handleOpenAuth}
       />
 
       {activeTab === 'single' && (
@@ -120,6 +136,10 @@ export default function App() {
         </main>
       )}
 
+      {activeTab === 'doctor' && (
+        <DoctorDashboard />
+      )}
+
       {activeTab === 'longitudinal' && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <LongitudinalTab />
@@ -152,7 +172,24 @@ export default function App() {
         onClose={() => setShowAuditDrawer(false)}
         healthData={healthData}
       />
+
+      {/* Login / Signup Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialRole={authModalRole}
+        initialMode={authModalMode}
+      />
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  );
+}
+
 

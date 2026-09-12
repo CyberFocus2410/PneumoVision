@@ -4,6 +4,19 @@
 
 const API_BASE = '/v1';
 
+export function getAuthToken() {
+  return localStorage.getItem('pv_token') || null;
+}
+
+export function getAuthHeaders() {
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export async function fetchSystemHealth() {
   const res = await fetch(`${API_BASE}/health`);
   if (!res.ok) throw new Error('Failed to fetch system health');
@@ -16,7 +29,7 @@ export async function fetchSamples() {
   return res.json();
 }
 
-export async function analyzeImage(fileOrSampleId, { useTta = true, useMcDropout = true } = {}) {
+export async function analyzeImage(fileOrSampleId, { useTta = true, useMcDropout = true, patientId = null } = {}) {
   const formData = new FormData();
   if (typeof fileOrSampleId === 'string') {
     formData.append('sample_id', fileOrSampleId);
@@ -25,9 +38,19 @@ export async function analyzeImage(fileOrSampleId, { useTta = true, useMcDropout
   }
   formData.append('use_tta', useTta);
   formData.append('use_mc_dropout', useMcDropout);
+  if (patientId) {
+    formData.append('patient_id', patientId);
+  }
+
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const res = await fetch(`${API_BASE}/analyze`, {
     method: 'POST',
+    headers,
     body: formData
   });
 
@@ -41,7 +64,7 @@ export async function analyzeImage(fileOrSampleId, { useTta = true, useMcDropout
 export async function generateReport(analysisResult, clinicianNotes = '') {
   const res = await fetch(`${API_BASE}/report`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       analysis_result: analysisResult,
       clinician_notes: clinicianNotes
@@ -60,8 +83,15 @@ export async function compareLongitudinal(prior, current) {
   if (typeof current === 'string') formData.append('current_sample_id', current);
   else formData.append('current_file', current);
 
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}/compare`, {
     method: 'POST',
+    headers,
     body: formData
   });
 
@@ -72,7 +102,7 @@ export async function compareLongitudinal(prior, current) {
 export async function submitClinicianFeedback({ caseId, finding, agreement, notes = '', suggestedCorrection = null }) {
   const res = await fetch(`${API_BASE}/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       case_id: caseId,
       finding,
@@ -87,7 +117,7 @@ export async function submitClinicianFeedback({ caseId, finding, agreement, note
 export async function grantConsent({ patientId, providerAddress, callerAddress = null }) {
   const res = await fetch(`${API_BASE}/consent/grant`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       patient_id: patientId,
       provider_address: providerAddress,
@@ -104,7 +134,7 @@ export async function grantConsent({ patientId, providerAddress, callerAddress =
 export async function revokeConsent({ patientId, providerAddress, callerAddress = null }) {
   const res = await fetch(`${API_BASE}/consent/revoke`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       patient_id: patientId,
       provider_address: providerAddress,
@@ -123,7 +153,12 @@ export async function fetchPatientRecords(patientId, callerAddress = null) {
   if (callerAddress) {
     url += `?caller_address=${encodeURIComponent(callerAddress)}`;
   }
-  const res = await fetch(url);
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to retrieve records' }));
     throw new Error(err.detail || 'Failed to retrieve records');
@@ -134,7 +169,7 @@ export async function fetchPatientRecords(patientId, callerAddress = null) {
 export async function addTreatmentRecord(patientId, payload) {
   const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/treatment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
@@ -147,7 +182,7 @@ export async function addTreatmentRecord(patientId, payload) {
 export async function addMedicationRecord(patientId, payload) {
   const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/medication`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
@@ -160,7 +195,7 @@ export async function addMedicationRecord(patientId, payload) {
 export async function addOutcomeRecord(patientId, payload) {
   const res = await fetch(`${API_BASE}/records/${encodeURIComponent(patientId)}/outcome`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
@@ -169,4 +204,134 @@ export async function addOutcomeRecord(patientId, payload) {
   }
   return res.json();
 }
+
+/* =========================================================================
+   Authentication & Provider Directory Endpoints
+   ========================================================================= */
+
+export async function apiDoctorSignup({ email, password, full_name, wallet_address, medical_license, hospital_affiliation }) {
+  const res = await fetch(`${API_BASE}/auth/doctor/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      full_name,
+      wallet_address,
+      medical_license,
+      hospital_affiliation: hospital_affiliation || 'PneumoVision Diagnostic Network'
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Doctor signup failed' }));
+    throw new Error(err.detail || 'Doctor signup failed');
+  }
+  return res.json();
+}
+
+export async function apiDoctorLogin({ email, password }) {
+  const res = await fetch(`${API_BASE}/auth/doctor/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Doctor login failed' }));
+    throw new Error(err.detail || 'Doctor login failed');
+  }
+  return res.json();
+}
+
+export async function apiPatientSignup({ email, password, full_name, wallet_address, patient_id }) {
+  const payload = { email, password, full_name };
+  if (wallet_address) payload.wallet_address = wallet_address;
+  if (patient_id) payload.patient_id = patient_id;
+
+  const res = await fetch(`${API_BASE}/auth/patient/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Patient signup failed' }));
+    throw new Error(err.detail || 'Patient signup failed');
+  }
+  return res.json();
+}
+
+export async function apiPatientLogin({ email, password }) {
+  const res = await fetch(`${API_BASE}/auth/patient/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Patient login failed' }));
+    throw new Error(err.detail || 'Patient login failed');
+  }
+  return res.json();
+}
+
+export async function apiGetMe() {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch user session' }));
+    throw new Error(err.detail || 'Failed to fetch user session');
+  }
+  return res.json();
+}
+
+export async function apiGetPatientProfile() {
+  const res = await fetch(`${API_BASE}/me/patient-profile`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch patient profile' }));
+    throw new Error(err.detail || 'Failed to fetch patient profile');
+  }
+  return res.json();
+}
+
+export async function apiUpdateWallet(wallet_address) {
+  const res = await fetch(`${API_BASE}/me/wallet`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ wallet_address })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update wallet address' }));
+    throw new Error(err.detail || 'Failed to update wallet address');
+  }
+  return res.json();
+}
+
+export async function fetchVerifiedProviders() {
+  const res = await fetch(`${API_BASE}/providers`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to load verified providers' }));
+    throw new Error(err.detail || 'Failed to load verified providers');
+  }
+  return res.json();
+}
+
+export async function apiAuthorizeProviderAdmin({ doctor_id, doctor_email, provider_address, provider_name }) {
+  const res = await fetch(`${API_BASE}/admin/providers/authorize`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      doctor_id,
+      doctor_email,
+      provider_address,
+      provider_name
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Admin authorization failed' }));
+    throw new Error(err.detail || 'Admin authorization failed');
+  }
+  return res.json();
+}
+
 

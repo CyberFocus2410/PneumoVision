@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Shield, KeyRound, UserCheck, UserX, CheckCircle, AlertCircle, RefreshCw, Building, Hash } from 'lucide-react';
-import { grantConsent, revokeConsent } from '../api';
+import React, { useState, useEffect } from 'react';
+import { Shield, KeyRound, UserCheck, UserX, CheckCircle, AlertCircle, RefreshCw, Building, Hash, Stethoscope, Award } from 'lucide-react';
+import { grantConsent, revokeConsent, fetchVerifiedProviders } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_PROVIDERS = [
   { name: 'St. Jude Childrens Research Hospital', address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', role: 'Pediatric Pulmonology' },
@@ -9,12 +10,14 @@ const DEFAULT_PROVIDERS = [
 ];
 
 export default function AccessControlTab() {
-  const [patientId, setPatientId] = useState('PATIENT_FULL_CARE_TIMELINE_04');
+  const { user, patient_id } = useAuth();
+  const [patientId, setPatientId] = useState(patient_id || 'PATIENT_FULL_CARE_TIMELINE_04');
+  const [verifiedProviders, setVerifiedProviders] = useState([]);
   const [providerAddress, setProviderAddress] = useState(DEFAULT_PROVIDERS[0].address);
   const [providerName, setProviderName] = useState(DEFAULT_PROVIDERS[0].name);
   const [activeGrants, setActiveGrants] = useState([
     {
-      patientId: 'PATIENT_FULL_CARE_TIMELINE_04',
+      patientId: patient_id || 'PATIENT_FULL_CARE_TIMELINE_04',
       providerName: 'St. Jude Childrens Research Hospital',
       providerAddress: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
       grantedAt: new Date().toLocaleTimeString(),
@@ -23,6 +26,29 @@ export default function AccessControlTab() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    if (patient_id) {
+      setPatientId(patient_id);
+    }
+    fetchVerifiedProviders()
+      .then((docs) => {
+        if (docs && docs.length > 0) {
+          const formatted = docs.map((d) => ({
+            name: `Dr. ${d.full_name} (${d.hospital_affiliation || 'Verified MD'})`,
+            address: d.wallet_address,
+            role: d.medical_license || 'Verified Physician'
+          }));
+          setVerifiedProviders(formatted);
+          if (formatted[0]) {
+            setProviderAddress(formatted[0].address);
+            setProviderName(formatted[0].name);
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load verified provider directory:', err.message));
+  }, [patient_id]);
+
 
   const handleSelectPreset = (p) => {
     setProviderAddress(p.address);
@@ -154,11 +180,16 @@ export default function AccessControlTab() {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Provider Presets
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
-                {DEFAULT_PROVIDERS.map((p, idx) => (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Verified Healthcare Provider Directory
+                </label>
+                <span style={{ fontSize: '0.68rem', color: 'var(--cyan-primary)', fontWeight: 700 }}>
+                  {verifiedProviders.length + DEFAULT_PROVIDERS.length} Available Nodes
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                {[...verifiedProviders, ...DEFAULT_PROVIDERS].map((p, idx) => (
                   <div
                     key={idx}
                     onClick={() => handleSelectPreset(p)}
@@ -175,7 +206,10 @@ export default function AccessControlTab() {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Stethoscope size={13} color="var(--cyan-primary)" />
+                        {p.name}
+                      </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{p.address}</div>
                     </div>
                     <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
