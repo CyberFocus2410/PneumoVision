@@ -26,14 +26,14 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-base font-body-md text-text-primary antialiased">
+    <div className="h-screen max-h-screen flex flex-col bg-surface-base font-body-md text-text-primary antialiased overflow-hidden">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenAuth={handleOpenAuth}
       />
 
-      <main className="w-full min-h-[calc(100vh-120px)] bg-surface-base flex-1">
+      <main className="w-full flex-1 min-h-0 bg-surface-base overflow-hidden flex flex-col">
         {(activeTab === 'screening' || activeTab === 'single') && (
           <DiagnosticScreeningTab onCommitLedger={() => setActiveTab('history')} />
         )}

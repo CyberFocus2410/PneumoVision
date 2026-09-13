@@ -536,7 +536,7 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
   };
 
   return (
-    <div className="flex flex-col w-full font-sans bg-slate-950 text-slate-100 min-h-screen">
+    <div className="flex flex-col w-full font-sans bg-slate-950 text-slate-100 h-full max-h-full overflow-hidden">
       {/* 1. Interactive Benchmark Studies Selector Bar */}
       <div className="w-full bg-[#070D1E] border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-2">
@@ -773,10 +773,10 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
           </div>
 
           {/* Radiograph Display Canvas */}
-          <div className="relative flex-1 w-full min-h-[580px] flex items-center justify-center p-4 bg-[#050811] overflow-hidden">
+          <div className="relative flex-1 w-full min-h-[340px] max-h-[460px] flex items-center justify-center p-3 bg-[#050811] overflow-hidden">
             <div
               onClick={handleCanvasClick}
-              className="relative max-w-[540px] w-full max-h-[620px] flex items-center justify-center transition-transform duration-200 cursor-crosshair group select-none"
+              className="relative max-w-[440px] w-full max-h-[440px] flex items-center justify-center transition-transform duration-200 cursor-crosshair group select-none"
               style={{ transform: `scale(${zoomLevel / 100})` }}
             >
               {/* Base Raw Radiograph Layer */}
