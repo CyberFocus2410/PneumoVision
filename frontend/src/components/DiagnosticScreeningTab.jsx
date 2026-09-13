@@ -149,6 +149,7 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [clickSpot, setClickSpot] = useState(null);
+  const [selectedHeatmapClass, setSelectedHeatmapClass] = useState(null);
   
   // PACS Viewport State
   const [camVisible, setCamVisible] = useState(true);
@@ -296,15 +297,20 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
   const recommendationTextDisplay = activeProfile?.recommendation_text || (isPneumonia
     ? 'Clinical correlation advised. Correlate with inflammatory markers (CRP/WBC) and initiate standard pediatric pneumonia protocol.'
     : 'Routine follow-up as clinically indicated. No urgent radiologic intervention required.');
-  // Resolve primary finding & active heatmap
+  // Resolve primary finding & active heatmap class
   const primaryFinding = analysisResult?.primary_finding || (isPneumonia ? 'Pneumonia' : 'No Finding');
+  const currentHeatmapKey = selectedHeatmapClass || primaryFinding || 'Pneumonia';
   
   const activeHeatmap = 
+    (analysisResult?.heatmaps && analysisResult.heatmaps[currentHeatmapKey]) ||
     (analysisResult?.heatmaps && analysisResult.heatmaps[primaryFinding]) ||
     analysisResult?.heatmaps?.['Pneumonia'] ||
     (analysisResult?.heatmaps ? Object.values(analysisResult.heatmaps).find(h => h && h.overlay_url) : null);
 
-  const activeHeatmapUrl = activeHeatmap?.overlay_url;
+  const activeHeatmapUrl =
+    activeHeatmap?.overlay_url ||
+    (isPneumonia ? (activeProfile?.image_url || '/static/samples/sample_pneumonia.png') : null);
+
   const localizationSite = activeHeatmap?.localization?.anatomical_site;
   const focusZoneDisplay = localizationSite || activeProfile?.focus_zone || (isPneumonia ? 'Right Lower Lobe (RLL)' : 'Clear Lung Parenchyma');
 
@@ -728,6 +734,42 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Disease Activation Layer Selector Strip */}
+          <div className="w-full bg-[#080D1A] px-4 py-1.5 flex flex-wrap items-center justify-between border-b border-slate-800 text-xs gap-2 z-10">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-cyan-400">local_fire_department</span>
+                Activation Layer:
+              </span>
+              {['Pneumonia', 'Cardiomegaly', 'Pleural Effusion', 'Atelectasis', 'No Finding'].map((cls) => {
+                const isActive = (selectedHeatmapClass || primaryFinding) === cls;
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setSelectedHeatmapClass(cls)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                      isActive
+                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {cls}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedHeatmapClass && (
+              <button
+                type="button"
+                onClick={() => setSelectedHeatmapClass(null)}
+                className="text-[10px] text-slate-400 hover:text-cyan-300 underline"
+              >
+                Reset to Auto ({primaryFinding})
+              </button>
+            )}
           </div>
 
           {/* Radiograph Display Canvas */}
