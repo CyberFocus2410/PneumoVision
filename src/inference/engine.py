@@ -271,15 +271,15 @@ class PneumoInferenceEngine:
                 is_cls_pos = any(p["positive"] for p in predictions if p["label"] == cls_name)
                 
                 if save_heatmaps:
-                    # Only draw bounding box / contours if condition is positive and abnormal
-                    should_draw = is_cls_pos and (cls_name not in ("No Finding", "No_Finding", "Normal"))
+                    # Draw bounding box and contours whenever peak attention >= 0.20
+                    has_peak = bool(np.max(cam_2d) >= 0.20)
                     overlay_img = overlay_heatmap_on_image(
                         pil_img,
                         cam_2d,
-                        alpha=0.65 if should_draw else (0.0 if cls_name in ("No Finding", "No_Finding", "Normal") else 0.45),
+                        alpha=0.60,
                         threshold=0.15,
-                        draw_contours=should_draw,
-                        draw_box=should_draw
+                        draw_contours=has_peak,
+                        draw_box=has_peak
                     )
                     side_by_side = create_side_by_side_comparison(pil_img, overlay_img, finding_title=cls_name)
 

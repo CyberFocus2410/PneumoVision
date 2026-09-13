@@ -62,10 +62,7 @@ class PneumoGradCAM:
         true thoracic pulmonary and mediastinal compartments.
         Zeroes out all extrathoracic structures (shoulders, clavicles, neck, arms, and camera margins).
         """
-        # If class is 'No Finding' / 'Normal' or index out of range for binary model, return clean empty map
-        if class_name in ("No Finding", "Normal", "No_Finding"):
-            return np.zeros((512, 512), dtype=np.float32)
-
+        # If class is 'No Finding' / 'Normal' or index out of range, use target class index 0 (primary parenchymal feature map)
         with torch.enable_grad():
             input_img = input_tensor.clone().detach().requires_grad_(True)
             self.model.zero_grad()
@@ -78,12 +75,9 @@ class PneumoGradCAM:
             else:
                 logits = self.model(input_img)
 
-            # Handle binary model where logits shape is [batch, 1]
+            # Handle binary or multi-class logits
             num_logits = logits.shape[1] if logits.ndim > 1 else 1
-            if target_class_idx >= num_logits:
-                if num_logits == 1 and target_class_idx == 1:
-                    # "No Finding" complement index -> return clean map
-                    return np.zeros((512, 512), dtype=np.float32)
+            if target_class_idx >= num_logits or class_name in ("No Finding", "Normal", "No_Finding"):
                 eff_idx = 0
             else:
                 eff_idx = target_class_idx
