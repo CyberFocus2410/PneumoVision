@@ -78,20 +78,39 @@ class PatientRecordsClient:
         # 2. Load ABI and Bytecode
         self.abi, self.bytecode = self._load_artifact()
         
-        # 3. Setup Accounts
+        # 3. Setup Accounts & Remote Signer
+        private_key = os.environ.get("PRIVATE_KEY") or os.environ.get("MST_TESTNET_PRIVATE_KEY")
+        self.signer_account = None
+        if private_key:
+            if not private_key.startswith("0x"):
+                private_key = f"0x{private_key}"
+            try:
+                from eth_account import Account
+                self.signer_account = Account.from_key(private_key)
+            except Exception as err:
+                print(f"Warning: Failed to load PRIVATE_KEY: {err}")
+
         self.accounts = list(self.w3.eth.accounts) if hasattr(self.w3.eth, "accounts") and self.w3.eth.accounts else []
-        if not self.accounts:
+        if self.signer_account:
+            if self.signer_account.address not in self.accounts:
+                self.accounts.insert(0, self.signer_account.address)
+            self.default_account = self.signer_account.address
+            self.admin_account = self.signer_account.address
+            self.default_doctor = os.environ.get("DOCTOR_WALLET_ADDRESS", self.signer_account.address)
+        elif not self.accounts:
             # Generate local dev account if needed
             acct = self.w3.eth.account.create()
             self.accounts = [acct.address]
             self.default_account = acct.address
+            self.admin_account = acct.address
+            self.default_doctor = acct.address
         else:
             self.default_account = self.accounts[0]
+            self.admin_account = self.accounts[0]
+            self.default_doctor = self.accounts[1] if len(self.accounts) > 1 else self.default_account
 
         self.w3.eth.default_account = self.default_account
-        self.admin_account = self.accounts[0]
-        self.default_doctor = self.accounts[1] if len(self.accounts) > 1 else self.accounts[0]
-        self.default_patient = self.accounts[2] if len(self.accounts) > 2 else self.accounts[0]
+        self.default_patient = self.accounts[2] if len(self.accounts) > 2 else self.default_account
 
         # 4. Bind or Deploy Contract
         self.contract_address = contract_address or os.environ.get("PATIENT_RECORDS_CONTRACT_ADDRESS")
@@ -101,6 +120,51 @@ class PatientRecordsClient:
             self.contract = self.w3.eth.contract(address=self.contract_address, abi=self.abi)
         elif auto_deploy:
             self._deploy_contract()
+
+    def _execute_tx(self, func_or_constructor, sender: Optional[str] = None) -> Tuple[Any, Any]:
+        """Sends a transaction either via unlocked local RPC account or locally signed raw transaction."""
+        sender_addr = sender or self.default_account
+        if self.signer_account and (self.signer_account.address.lower() == sender_addr.lower() or not hasattr(self.w3.eth, "accounts") or not self.w3.eth.accounts or sender_addr not in self.w3.eth.accounts):
+            nonce = self.w3.eth.get_transaction_count(self.signer_account.address, "pending")
+            gas_price = self.w3.eth.gas_price
+            chain_id = self.w3.eth.chain_id
+            tx_data = func_or_constructor.build_transaction({
+                "from": self.signer_account.address,
+                "nonce": nonce,
+                "gasPrice": gas_price,
+                "chainId": chain_id
+            })
+            try:
+                gas_est = self.w3.eth.estimate_gas(tx_data)
+                tx_data["gas"] = int(gas_est * 1.25)
+            except Exception:
+                tx_data["gas"] = 3000000
+            signed = self.signer_account.sign_transaction(tx_data)
+            tx_raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+            try:
+                tx_hash = self.w3.eth.send_raw_transaction(tx_raw)
+            except ValueError as val_err:
+                err_msg = str(val_err)
+                if "nonce too low" in err_msg or "-32000" in err_msg:
+                    import re
+                    match = re.search(r'next nonce (\d+)', err_msg)
+                    if match:
+                        tx_data["nonce"] = int(match.group(1))
+                    else:
+                        tx_data["nonce"] = self.w3.eth.get_transaction_count(self.signer_account.address, "pending") + 1
+                    signed = self.signer_account.sign_transaction(tx_data)
+                    tx_raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+                    tx_hash = self.w3.eth.send_raw_transaction(tx_raw)
+                else:
+                    raise
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            return tx_hash, receipt
+
+        else:
+            tx_hash = func_or_constructor.transact({"from": sender_addr})
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            return tx_hash, receipt
+
 
     def _init_web3(self) -> Web3:
         """Initializes Web3 with HTTPProvider or in-memory EthereumTesterProvider."""
@@ -127,8 +191,7 @@ class PatientRecordsClient:
     def _deploy_contract(self):
         """Deploys a fresh instance of PatientRecords."""
         factory = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = factory.constructor().transact({"from": self.admin_account})
-        tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_hash, tx_receipt = self._execute_tx(factory.constructor(), sender=self.admin_account)
         
         self.contract_address = tx_receipt.contractAddress
         self.contract = self.w3.eth.contract(address=self.contract_address, abi=self.abi)
@@ -143,12 +206,25 @@ class PatientRecordsClient:
     def authorize_provider(self, provider_address: str, name: str, caller: Optional[str] = None) -> str:
         """Authorizes a doctor or hospital address on-chain."""
         sender = caller or self.admin_account
-        tx_hash = self.contract.functions.authorizeProvider(
-            Web3.to_checksum_address(provider_address),
-            name
-        ).transact({"from": sender})
-        self.w3.eth.wait_for_transaction_receipt(tx_hash)
-        return tx_hash.hex()
+        tx_hash, _ = self._execute_tx(
+            self.contract.functions.authorizeProvider(
+                Web3.to_checksum_address(provider_address),
+                name
+            ),
+            sender=sender
+        )
+        return tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
+
+    def revoke_provider(self, provider_address: str, caller: Optional[str] = None) -> str:
+        """Revokes authorization of a doctor or hospital address on-chain."""
+        sender = caller or self.admin_account
+        tx_hash, _ = self._execute_tx(
+            self.contract.functions.revokeProvider(
+                Web3.to_checksum_address(provider_address)
+            ),
+            sender=sender
+        )
+        return tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
     def register_patient(
         self,
@@ -170,14 +246,14 @@ class PatientRecordsClient:
                 "patient_address": profile[0]
             }
 
-        tx_hash = self.contract.functions.registerPatient(p_bytes).transact({"from": sender})
-        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_hash, receipt = self._execute_tx(self.contract.functions.registerPatient(p_bytes), sender=sender)
+        tx_hex = tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
         return {
             "status": "REGISTERED",
             "patient_id": to_hex_bytes32(patient_id),
             "patient_address": sender,
-            "tx_hash": tx_hash.hex(),
+            "tx_hash": tx_hex,
             "block_number": receipt.blockNumber
         }
 
@@ -208,17 +284,26 @@ class PatientRecordsClient:
             self.register_patient(patient_id, patient_address=self.default_patient)
 
         # Ensure sender is authorized provider
-        if not self.contract.functions.authorizedProviders(sender).call():
-            self.authorize_provider(sender, "Authorized Healthcare Provider")
+        is_authorized = bool(self.contract.functions.authorizedProviders(sender).call())
+        if not is_authorized:
+            local_dev_mode = os.environ.get("LOCAL_DEV_MODE", "false").lower() in ("true", "1", "yes")
+            if local_dev_mode:
+                self.authorize_provider(sender, "Authorized Healthcare Provider (Dev Mode)")
+            else:
+                raise PermissionError(
+                    f"UnauthorizedProvider: Address {sender} is not an authorized healthcare provider on-chain."
+                )
 
-        tx_hash = self.contract.functions.addRecord(
-            p_bytes,
-            r_type,
-            c_bytes,
-            off_chain_ref
-        ).transact({"from": sender})
-
-        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_hash, receipt = self._execute_tx(
+            self.contract.functions.addRecord(
+                p_bytes,
+                r_type,
+                c_bytes,
+                off_chain_ref
+            ),
+            sender=sender
+        )
+        tx_hex = tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
         # Parse RecordAdded event
         events = self.contract.events.RecordAdded().process_receipt(receipt)
@@ -232,7 +317,7 @@ class PatientRecordsClient:
             "content_hash": to_hex_bytes32(content_hash),
             "off_chain_ref": off_chain_ref,
             "provider_address": sender,
-            "tx_hash": tx_hash.hex(),
+            "tx_hash": tx_hex,
             "block_number": receipt.blockNumber,
             "contract_address": self.contract_address
         }
@@ -250,14 +335,14 @@ class PatientRecordsClient:
         profile = self.contract.functions.patients(p_bytes).call()
         sender = patient_address or profile[0] or self.default_patient
 
-        tx_hash = self.contract.functions.grantAccess(p_bytes, grantee).transact({"from": sender})
-        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_hash, receipt = self._execute_tx(self.contract.functions.grantAccess(p_bytes, grantee), sender=sender)
+        tx_hex = tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
         return {
             "status": "ACCESS_GRANTED",
             "patient_id": to_hex_bytes32(patient_id),
             "grantee": grantee,
-            "tx_hash": tx_hash.hex(),
+            "tx_hash": tx_hex,
             "block_number": receipt.blockNumber
         }
 
@@ -274,18 +359,19 @@ class PatientRecordsClient:
         profile = self.contract.functions.patients(p_bytes).call()
         sender = patient_address or profile[0] or self.default_patient
 
-        tx_hash = self.contract.functions.revokeAccess(p_bytes, grantee).transact({"from": sender})
-        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        tx_hash, receipt = self._execute_tx(self.contract.functions.revokeAccess(p_bytes, grantee), sender=sender)
+        tx_hex = tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
         return {
             "status": "ACCESS_REVOKED",
             "patient_id": to_hex_bytes32(patient_id),
             "grantee": grantee,
-            "tx_hash": tx_hash.hex(),
+            "tx_hash": tx_hex,
             "block_number": receipt.blockNumber
         }
 
     def has_access(self, patient_id: Union[str, bytes], caller_address: str) -> bool:
+
         """Checks if caller has permission to view patient's records."""
         p_bytes = to_bytes32(patient_id)
         caller = Web3.to_checksum_address(caller_address)

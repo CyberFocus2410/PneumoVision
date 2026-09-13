@@ -10,6 +10,13 @@ import yaml
 
 # Base project paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load project .env if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+except ImportError:
+    pass
 SRC_DIR = BASE_DIR / "src"
 DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"

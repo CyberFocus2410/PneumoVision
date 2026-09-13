@@ -62,119 +62,69 @@ class PneumoGradCAM:
         true thoracic pulmonary and mediastinal compartments.
         Zeroes out all extrathoracic structures (shoulders, clavicles, neck, arms, and camera margins).
         """
-        # If class is 'No Finding' / 'Normal' or index out of range for binary model, return clean empty map
-        if class_name in ("No Finding", "Normal", "No_Finding"):
-            return np.zeros((512, 512), dtype=np.float32)
+        # If class is 'No Finding' / 'Normal' or index out of range, use target class index 0 (primary parenchymal feature map)
+        with torch.enable_grad():
+            input_img = input_tensor.clone().detach().requires_grad_(True)
+            self.model.zero_grad()
+            
+            # Forward pass with active gradient graph
+            if hasattr(self.model, "temperature_scale"):
+                logits = self.model(input_img, return_logits=True)
+            elif hasattr(self.model, "forward") and "return_logits" in self.model.forward.__code__.co_varnames:
+                logits = self.model(input_img, return_logits=True)
+            else:
+                logits = self.model(input_img)
 
-        self.model.zero_grad()
-        
-        # Forward pass
-        if hasattr(self.model, "temperature_scale"):
-            logits = self.model(input_tensor, return_logits=True)
-        elif hasattr(self.model, "forward") and "return_logits" in self.model.forward.__code__.co_varnames:
-            logits = self.model(input_tensor, return_logits=True)
-        else:
-            logits = self.model(input_tensor)
+            # Handle binary or multi-class logits
+            num_logits = logits.shape[1] if logits.ndim > 1 else 1
+            if target_class_idx >= num_logits or class_name in ("No Finding", "Normal", "No_Finding"):
+                eff_idx = 0
+            else:
+                eff_idx = target_class_idx
 
-        # Handle binary model where logits shape is [batch, 1]
-        num_logits = logits.shape[1] if logits.ndim > 1 else 1
-        if target_class_idx >= num_logits:
-            if num_logits == 1 and target_class_idx == 1:
-                # "No Finding" complement index -> return clean map
+            target_score = logits[0, eff_idx]
+            target_score.backward(retain_graph=True)
+
+            if self.gradients is None or self.activations is None:
                 return np.zeros((512, 512), dtype=np.float32)
-            eff_idx = 0
-        else:
-            eff_idx = target_class_idx
 
-        target_score = logits[0, eff_idx]
-        target_score.backward(retain_graph=True)
+            gradients = self.gradients[0]     # [C, H_feat, W_feat]
+            activations = self.activations[0] # [C, H_feat, W_feat]
 
-        gradients = self.gradients[0]     # [C, H_feat, W_feat]
-        activations = self.activations[0] # [C, H_feat, W_feat]
+        # Combined Grad-CAM++ and HiRes-CAM calculation
+        weights = gradients.mean(dim=(1, 2), keepdim=True)
+        cam_global = F.relu((weights * activations).sum(dim=0)).cpu().numpy()
+        cam_hires = F.relu(activations * gradients).sum(dim=0).cpu().numpy()
+        
+        # Fuse global semantic weights with local element-wise gradient attribution
+        cam_raw = 0.6 * cam_global + 0.4 * cam_hires
 
-        # 1. HiRes-CAM: element-wise feature attribution
-        hires_cam = F.relu(activations * gradients).sum(dim=0).cpu().numpy()
-
-        h_min, h_max = np.min(hires_cam), np.max(hires_cam)
+        h_min, h_max = np.min(cam_raw), np.max(cam_raw)
         if h_max > h_min:
-            cam_norm = (hires_cam - h_min) / (h_max - h_min)
+            cam_norm = (cam_raw - h_min) / (h_max - h_min)
         else:
-            cam_norm = np.zeros_like(hires_cam)
+            cam_norm = np.zeros_like(cam_raw)
 
-        # Upsample to 512x512
+        # Upsample to high resolution 512x512 with smooth bicubic interpolation
         cam_512 = cv2.resize(cam_norm, (512, 512), interpolation=cv2.INTER_CUBIC)
-        cam_512 = cv2.GaussianBlur(cam_512, (21, 21), 0)
+        cam_512 = cv2.GaussianBlur(cam_512, (19, 19), 0)
 
-        # -------------------------------------------------------------
-        # 2. Strict Anatomical Thoracic & Lung Field Segmentation
-        # -------------------------------------------------------------
+        # Natural margin feathering: zero out extreme outer borders (edge scanning artifacts)
         h_f, w_f = 512, 512
         y_grid, x_grid = np.ogrid[:h_f, :w_f]
-        
-        # Normalized coordinates [0.0, 1.0]
         nx = x_grid.astype(np.float32) / w_f
         ny = y_grid.astype(np.float32) / h_f
 
-        # A. Bilateral Lung Fields Model:
-        # Right Lung: nx in [0.18, 0.47], ny in [0.20, 0.84]
-        # Left Lung:  nx in [0.53, 0.82], ny in [0.20, 0.84]
-        right_lung_center = np.exp(-(((nx - 0.32)**2)/(2 * 0.10**2) + ((ny - 0.52)**2)/(2 * 0.22**2)))
-        left_lung_center  = np.exp(-(((nx - 0.68)**2)/(2 * 0.10**2) + ((ny - 0.52)**2)/(2 * 0.22**2)))
-        bilateral_lungs = np.maximum(right_lung_center, left_lung_center)
+        # Keep active thoracic window (5% margin from edges)
+        margin_mask = (nx >= 0.06) & (nx <= 0.94) & (ny >= 0.06) & (ny <= 0.94)
+        margin_weight = cv2.GaussianBlur(margin_mask.astype(np.float32), (31, 31), 0)
 
-        # B. Mediastinal Cardiac Compartment:
-        # Heart Silhouette: nx in [0.36, 0.64], ny in [0.46, 0.82]
-        cardiac_mediastinum = np.exp(-(((nx - 0.50)**2)/(2 * 0.10**2) + ((ny - 0.64)**2)/(2 * 0.14**2)))
+        focal_map = cam_512 * margin_weight
 
-        # C. Costophrenic Bases Compartment (Pleural Effusion):
-        # Basilar dependent recesses: ny > 0.58, lateral lung bases
-        right_cp = np.exp(-(((nx - 0.26)**2)/(2 * 0.08**2) + ((ny - 0.76)**2)/(2 * 0.10**2)))
-        left_cp  = np.exp(-(((nx - 0.74)**2)/(2 * 0.08**2) + ((ny - 0.76)**2)/(2 * 0.10**2)))
-        costophrenic_bases = np.maximum(right_cp, left_cp)
-
-        # D. Extrathoracic Hard Barrier (Shoulders, Clavicles, Neck, Camera Border, Abdomen)
-        # Shoulders (upper lateral corners: ny < 0.28 and (nx < 0.22 or nx > 0.78))
-        # Neck / Top (ny < 0.16)
-        # Lateral arms (nx < 0.15 or nx > 0.85)
-        # Abdomen (ny > 0.86)
-        thoracic_boundary = (ny >= 0.18) & (ny <= 0.86) & (nx >= 0.16) & (nx <= 0.84)
-        
-        # Upper outer shoulder zeroing
-        shoulder_l = (ny < 0.32) & (nx < 0.26)
-        shoulder_r = (ny < 0.32) & (nx > 0.74)
-        neck = (ny < 0.18)
-
-        extrathoracic_mask = thoracic_boundary & (~shoulder_l) & (~shoulder_r) & (~neck)
-        extrathoracic_weight = cv2.GaussianBlur(extrathoracic_mask.astype(np.float32), (31, 31), 0)
-
-        # -------------------------------------------------------------
-        # 3. Apply Condition-Specific Anatomical Spatial Filter
-        # -------------------------------------------------------------
-        if class_name in ["Pneumonia", "Atelectasis"]:
-            # Strictly confined to pulmonary airspaces
-            anatomical_filter = bilateral_lungs * extrathoracic_weight
-        elif class_name == "Cardiomegaly":
-            # Strictly confined to cardiac mediastinal silhouette
-            anatomical_filter = cardiac_mediastinum * extrathoracic_weight
-        elif class_name == "Pleural Effusion":
-            # Strictly confined to lower costophrenic bases
-            anatomical_filter = np.maximum(costophrenic_bases, bilateral_lungs * (ny > 0.45)) * extrathoracic_weight
-        else:
-            anatomical_filter = extrathoracic_weight
-
-        # Fused neural attribution with anatomical lung filter
-        focal_map = cam_512 * anatomical_filter
-
-        # Zero out any leakage in extrathoracic boundary
-        focal_map[~extrathoracic_mask] = 0.0
-
-        # Smooth blending
-        focal_map = cv2.GaussianBlur(focal_map, (15, 15), 0)
-
-        # 4. Normalize and scale by model confidence
+        # Normalize output
         c_min, c_max = np.min(focal_map), np.max(focal_map)
-        if c_max > 0.05:
-            focal_map = focal_map / c_max
+        if c_max > 0.02:
+            focal_map = focal_map / (c_max + 1e-8)
         else:
             focal_map = np.zeros_like(focal_map)
 

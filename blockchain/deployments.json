@@ -1,0 +1,35 @@
+{
+  "localhost": {
+    "contractAddress": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb",
+    "transactionHash": "0x8739912beb37b86e3fd7e968be034df7bddc4b4da20a8b381095c21fd82c7629",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "network": "localhost",
+    "chainId": 31337,
+    "deployedAt": "2026-09-12T19:52:04.770Z",
+    "features": [
+      "Patient Identity Registration (registerPatient)",
+      "Provider Authorization Lifecycle (authorizeProvider, revokeProvider)",
+      "Consent Management (grantAccess, revokeAccess, hasAccess)",
+      "Tamper-evident Care Timeline (addRecord, getRecords, getRecordCount)"
+    ]
+  },
+  "mstTestnet": {
+    "contractAddress": "0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6",
+    "transactionHash": "0x8154d78602f13039799c391ac2eeef58ebb3bba357ff5a111ea4454c82cf073d",
+    "deployer": "0xb3C09303335393D511F9eE1C7Bf4f1154904142b",
+    "network": "mstTestnet",
+    "chainId": 91562037,
+    "deployedAt": "5330411",
+    "features": [
+      "Patient Identity Registration (registerPatient)",
+      "Provider Authorization Lifecycle (authorizeProvider, revokeProvider)",
+      "Consent Management (grantAccess, revokeAccess, hasAccess)",
+      "Tamper-evident Care Timeline (addRecord, getRecords, getRecordCount)"
+    ],
+    "sampleTransactions": {
+      "deploymentTx": "0x8154d78602f13039799c391ac2eeef58ebb3bba357ff5a111ea4454c82cf073d",
+      "patientRegistrationTx": "0x810a749a1f00da4e8418599d5d6933e99a2fe2cf2b775be247642dc920613e9e",
+      "medicalRecordCommitTx": "0x2df2ca0ff29c0c7a4bc3e97ff42e9e7238fd7949619a1b0aa098f2c0d9204a36"
+    }
+  }
+}

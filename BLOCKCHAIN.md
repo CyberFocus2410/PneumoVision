@@ -9,7 +9,7 @@
 
 PneumoVision uses a **hybrid off-chain / on-chain architecture**:
 - **Medical & Clinical Payloads Remain Off-Chain**: Full radiograph reports, Grad-CAM heatmaps, DICOM metadata, prescription details, and outcome records are stored in the secure local backend database (`data/records_db/`).
-- **Cryptographic Hashes & URIs Committed On-Chain**: Only deterministic cryptographic digests (**Keccak-256**) and storage resource identifiers (`offChainRef`) are written to the Ethereum smart contract (`PatientRecords.sol`).
+- **Cryptographic Hashes & URIs Committed On-Chain**: Only deterministic cryptographic digests (**Keccak-256**) and storage resource identifiers (`offChainRef`) are written to the MST Testnet smart contract (`PatientRecords.sol`).
 - **Pseudonymous Patient Identity**: Patients are registered with pseudonymous bytes32 identity hashes (`patientId`), with zero raw PII exposed on-chain.
 
 ```
@@ -27,10 +27,11 @@ PneumoVision uses a **hybrid off-chain / on-chain architecture**:
 +─────────────────────────────┼─────────────────────────────────────────────────────+
                               ▼
 +───────────────────────────────────────────────────────────────────────────────────+
-|                           LOCAL HARDHAT ETHEREUM NODE                             |
+|                           MST TESTNET BLOCKCHAIN NODE                             |
 |                                                                                   |
-|  PatientRecords.sol:                                                              |
+|  PatientRecords.sol (0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6):                 |
 |   ├── registerPatient(bytes32 patientId)                                          |
+|   ├── authorizeProvider(address provider, string name)                            |
 |   ├── grantAccess(bytes32 patientId, address provider)                            |
 |   ├── revokeAccess(bytes32 patientId, address provider)                           |
 |   ├── addRecord(patientId, recordType, contentHash, offChainRef)                  |
@@ -69,35 +70,21 @@ When records are retrieved via `/records/{patientId}`:
 
 ---
 
-## 4. Prototype Scope, Security, and Production Disclaimers
-
-### ⚠️ Demonstration & Educational Environment
-- This implementation runs against a local ephemeral Hardhat RPC node (`http://127.0.0.1:8545`).
-- It does **not** connect to Ethereum Mainnet or public testnets (e.g., Sepolia).
-
-### 🔑 Identity & Key Management Simplifications
-- Wallet addresses and signing keys are derived from local Hardhat test accounts.
-- This is a simplified stand-in for real-world cryptographic identity standards (such as Decentralized Identifiers [DIDs], Verifiable Credentials [VCs], HSMs, or WebAuthn/ERC-4337 smart contract accounts).
-
-### 🛡️ Absence of Formal Security Audit
-- Neither `PatientRecords.sol` nor `backend/blockchain/client.py` has undergone formal third-party cryptographic, smart-contract, or smart-contract audit.
-- Do not use this codebase for handling real financial assets or production healthcare infrastructures.
-
-### ⚖️ Legal, Ethical, and Regulatory Compliance
-- Any production deployment involving patient health records requires extensive legal and regulatory review under **HIPAA (Health Insurance Portability and Accountability Act)**, **GDPR (General Data Protection Regulation)**, and jurisdictional health data governance frameworks.
-- On-chain storage of personal data, even in pseudonymized or hashed format, may carry GDPR "Right to be Forgotten" (Article 17) compliance considerations that require off-chain cryptographic erasure techniques.
+## 4. Live MST Testnet Deployment
+- **Network**: MST Testnet (Chain ID: `91562037`)
+- **RPC Endpoint**: `https://testnetrpc.mstblockchain.com`
+- **Active Smart Contract**: `0x136E7f5c373065dE1E09Ec1D6258CF6e01A93Fb6`
+- **Verified Doctor / Provider Wallet**: `0xb3C09303335393D511F9eE1C7Bf4f1154904142b`
+- **Block Explorer**: [https://testnet.mstscan.com](https://testnet.mstscan.com)
 
 ---
 
-## 5. Local Hardhat Quickstart
+## 5. Security & Verification Suite
 
 ```bash
-# 1. Start local Hardhat node
-npx hardhat node
+# 1. Run full authentication, RBAC, and on-chain authorization integration tests
+pytest tests/test_auth_and_provider_authorization.py -v
 
-# 2. Deploy PatientRecords contract
-npx hardhat run blockchain/scripts/deploy.js --network localhost
-
-# 3. Run blockchain integration test suite
+# 2. Run tamper-evident care timeline and access control tests
 pytest tests/test_blockchain_records.py -v
 ```

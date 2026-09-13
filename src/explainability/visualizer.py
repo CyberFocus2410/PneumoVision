@@ -36,16 +36,15 @@ def get_anatomical_quadrant(center_x_norm: float, center_y_norm: float) -> str:
 def overlay_heatmap_on_image(
     original_img: Union[Image.Image, np.ndarray],
     heatmap_2d: np.ndarray,
-    alpha: float = 0.55,
+    alpha: float = 0.60,
     colormap: int = cv2.COLORMAP_TURBO,
-    threshold: float = 0.36,
+    threshold: float = 0.15,
     draw_contours: bool = True,
     draw_box: bool = True
 ) -> Image.Image:
     """
     Overlays a crisp, localized Grad-CAM++ heatmap onto the radiograph.
-    Background tissue below the threshold is left completely transparent and unaffected,
-    preventing washed-out or hazy full-image overlays.
+    Background tissue below the threshold is left clean and unaffected.
     """
     if isinstance(original_img, Image.Image):
         orig_np = np.array(original_img.convert("RGB"))
@@ -83,19 +82,19 @@ def overlay_heatmap_on_image(
         blended_hotspots = (orig_np * (1.0 - pixel_weight) + colored_cam * pixel_weight).astype(np.uint8)
         blended[mask] = blended_hotspots[mask]
 
-    # Draw clinical contour line around focal peak region (>= 0.45)
-    if draw_contours:
-        high_mask = (resized >= 0.45).astype(np.uint8) * 255
+    # Draw clinical contour line around focal peak region (>= 0.35)
+    if draw_contours and np.max(resized) >= 0.25:
+        high_mask = (resized >= 0.35).astype(np.uint8) * 255
         contours, _ = cv2.findContours(high_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(blended, contours, -1, (255, 215, 0), 2, cv2.LINE_AA)
 
     # Draw Peak Attention Crosshair & Bounding Box
-    if draw_box:
-        high_mask = (resized >= 0.50).astype(np.uint8) * 255
+    if draw_box and np.max(resized) >= 0.25:
+        high_mask = (resized >= 0.30).astype(np.uint8) * 255
         contours, _ = cv2.findContours(high_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest_c = max(contours, key=cv2.contourArea)
-            if cv2.contourArea(largest_c) > 120:
+            if cv2.contourArea(largest_c) > 60:
                 bx, by, bw, bh = cv2.boundingRect(largest_c)
                 cv2.rectangle(blended, (bx, by), (bx + bw, by + bh), (6, 182, 212), 2, cv2.LINE_AA)
                 cx, cy = bx + bw // 2, by + bh // 2
