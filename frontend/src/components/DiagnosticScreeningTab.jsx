@@ -148,6 +148,7 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
   const [customUploadPreview, setCustomUploadPreview] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [clickSpot, setClickSpot] = useState(null);
   
   // PACS Viewport State
   const [camVisible, setCamVisible] = useState(true);
@@ -305,7 +306,6 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
 
   const activeHeatmapUrl = activeHeatmap?.overlay_url;
   const localizationSite = activeHeatmap?.localization?.anatomical_site;
-
   const focusZoneDisplay = localizationSite || activeProfile?.focus_zone || (isPneumonia ? 'Right Lower Lobe (RLL)' : 'Clear Lung Parenchyma');
 
   const imageDisplayUrl =
@@ -313,6 +313,37 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
     customUploadPreview ||
     activeProfile?.image_url ||
     '/static/samples/sample_pneumonia.png';
+
+  const handleCanvasClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const xNorm = Math.max(0, Math.min(1, x / rect.width));
+    const yNorm = Math.max(0, Math.min(1, y / rect.height));
+
+    // Frontal CXR anatomical mapping: Patient Right is image Left!
+    const isPatientRight = xNorm < 0.5;
+    const sideStr = isPatientRight ? 'Right' : 'Left';
+
+    let regionStr = 'Mid-Lung Zone';
+    if (yNorm < 0.35) {
+      regionStr = 'Upper Lobe / Apical Zone';
+    } else if (yNorm > 0.65) {
+      regionStr = 'Lower Lobe / Basilar Airspace';
+    }
+
+    const anatomicalSite = `${sideStr} ${regionStr}`;
+
+    setClickSpot({
+      xPct: (xNorm * 100).toFixed(1),
+      yPct: (yNorm * 100).toFixed(1),
+      anatomicalSite,
+      primaryFinding: primaryFinding !== 'No Finding' ? primaryFinding : 'Pneumonia',
+      confidenceScore,
+      isPneumonia,
+      predictionsList
+    });
+  };
 
   // Real PDF Export handler
   const handleExportPDF = async () => {
@@ -702,7 +733,8 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
           {/* Radiograph Display Canvas */}
           <div className="relative flex-1 w-full min-h-[580px] flex items-center justify-center p-4 bg-[#050811] overflow-hidden">
             <div
-              className="relative max-w-[540px] w-full max-h-[620px] flex items-center justify-center transition-transform duration-200"
+              onClick={handleCanvasClick}
+              className="relative max-w-[540px] w-full max-h-[620px] flex items-center justify-center transition-transform duration-200 cursor-crosshair group select-none"
               style={{ transform: `scale(${zoomLevel / 100})` }}
             >
               {/* Base Raw Radiograph Layer */}
@@ -724,6 +756,89 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
                     filter: getFilterStyle()
                   }}
                 />
+              )}
+
+              {/* Interactive Target Reticle Pin & Clinical Tooltip Popover */}
+              {clickSpot && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-30"
+                  style={{ transform: `scale(${100 / zoomLevel})` }}
+                >
+                  {/* Pulsing Target Reticle */}
+                  <div
+                    className="absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 border-cyan-400 bg-cyan-500/30 animate-ping pointer-events-none"
+                    style={{ left: `${clickSpot.xPct}%`, top: `${clickSpot.yPct}%` }}
+                  />
+                  <div
+                    className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full bg-cyan-400 border-2 border-white shadow-xl pointer-events-none flex items-center justify-center"
+                    style={{ left: `${clickSpot.xPct}%`, top: `${clickSpot.yPct}%` }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                  </div>
+
+                  {/* Popover Card */}
+                  <div
+                    className="absolute pointer-events-auto w-72 bg-slate-900/95 backdrop-blur-md p-3.5 rounded-xl border border-cyan-500/60 shadow-2xl text-xs space-y-2.5 z-40"
+                    style={{
+                      left: `${Math.min(Number(clickSpot.xPct), 58)}%`,
+                      top: `${Math.min(Number(clickSpot.yPct), 55)}%`
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
+                        <span className="material-symbols-outlined text-[16px]">location_on</span>
+                        <span>{clickSpot.anatomicalSite}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setClickSpot(null); }}
+                        className="w-5 h-5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                        Primary Disease Representation:
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="font-bold text-white text-sm">{clickSpot.primaryFinding}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                          clickSpot.isPneumonia ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                        }`}>
+                          {clickSpot.confidenceScore}% Probability
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider flex justify-between">
+                        <span>Differential Multi-Label Breakdown</span>
+                        <span className="text-cyan-400">5 Evaluated</span>
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                        {clickSpot.predictionsList.map((p) => {
+                          const probVal = p.probability_percent || (p.probability * 100).toFixed(1);
+                          return (
+                            <div key={p.label} className="flex items-center justify-between bg-slate-950/70 px-2.5 py-1 rounded text-[11px] border border-slate-800">
+                              <span className="text-slate-200 font-medium">{p.label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-mono font-bold ${Number(probVal) >= 50 ? 'text-amber-400' : 'text-cyan-300'}`}>
+                                  {probVal}%
+                                </span>
+                                {p.positive && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
