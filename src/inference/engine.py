@@ -276,8 +276,8 @@ class PneumoInferenceEngine:
                     overlay_img = overlay_heatmap_on_image(
                         pil_img,
                         cam_2d,
-                        alpha=0.55 if should_draw else (0.0 if cls_name in ("No Finding", "No_Finding", "Normal") else 0.25),
-                        threshold=0.36,
+                        alpha=0.65 if should_draw else (0.0 if cls_name in ("No Finding", "No_Finding", "Normal") else 0.45),
+                        threshold=0.15,
                         draw_contours=should_draw,
                         draw_box=should_draw
                     )

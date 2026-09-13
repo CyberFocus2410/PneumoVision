@@ -295,7 +295,18 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
   const recommendationTextDisplay = activeProfile?.recommendation_text || (isPneumonia
     ? 'Clinical correlation advised. Correlate with inflammatory markers (CRP/WBC) and initiate standard pediatric pneumonia protocol.'
     : 'Routine follow-up as clinically indicated. No urgent radiologic intervention required.');
-  const focusZoneDisplay = activeProfile?.focus_zone || (isPneumonia ? 'Right Lower Lobe (RLL)' : 'Clear Lung Parenchyma');
+  // Resolve primary finding & active heatmap
+  const primaryFinding = analysisResult?.primary_finding || (isPneumonia ? 'Pneumonia' : 'No Finding');
+  
+  const activeHeatmap = 
+    (analysisResult?.heatmaps && analysisResult.heatmaps[primaryFinding]) ||
+    analysisResult?.heatmaps?.['Pneumonia'] ||
+    (analysisResult?.heatmaps ? Object.values(analysisResult.heatmaps).find(h => h && h.overlay_url) : null);
+
+  const activeHeatmapUrl = activeHeatmap?.overlay_url;
+  const localizationSite = activeHeatmap?.localization?.anatomical_site;
+
+  const focusZoneDisplay = localizationSite || activeProfile?.focus_zone || (isPneumonia ? 'Right Lower Lobe (RLL)' : 'Clear Lung Parenchyma');
 
   const imageDisplayUrl =
     analysisResult?.original_image_url ||
@@ -696,20 +707,20 @@ export default function DiagnosticScreeningTab({ onCommitLedger }) {
             >
               {/* Base Raw Radiograph Layer */}
               <img
-                src={analysisResult?.original_image_url || customUploadPreview || activeProfile?.image_url || '/static/samples/sample_pneumonia.png'}
+                src={imageDisplayUrl}
                 alt="Chest Radiograph Frontal View"
                 className="w-full h-auto object-contain rounded-lg shadow-2xl transition-[filter] duration-200 border border-slate-800"
                 style={{ filter: getFilterStyle() }}
               />
 
               {/* Real Neural Grad-CAM++ Heatmap Overlay Layer */}
-              {(analysisResult?.heatmaps?.Pneumonia?.overlay_url || (isPneumonia && activeProfile?.image_url)) && (
+              {activeHeatmapUrl && (
                 <img
-                  src={analysisResult?.heatmaps?.Pneumonia?.overlay_url || activeProfile?.image_url}
+                  src={activeHeatmapUrl}
                   alt="Grad-CAM Activation Overlay"
                   className="absolute inset-0 w-full h-full object-contain rounded-lg pointer-events-none transition-opacity duration-150"
                   style={{
-                    opacity: camVisible && isPneumonia ? camOpacity / 100 : 0,
+                    opacity: camVisible ? camOpacity / 100 : 0,
                     filter: getFilterStyle()
                   }}
                 />

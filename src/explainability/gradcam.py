@@ -66,31 +66,36 @@ class PneumoGradCAM:
         if class_name in ("No Finding", "Normal", "No_Finding"):
             return np.zeros((512, 512), dtype=np.float32)
 
-        self.model.zero_grad()
-        
-        # Forward pass
-        if hasattr(self.model, "temperature_scale"):
-            logits = self.model(input_tensor, return_logits=True)
-        elif hasattr(self.model, "forward") and "return_logits" in self.model.forward.__code__.co_varnames:
-            logits = self.model(input_tensor, return_logits=True)
-        else:
-            logits = self.model(input_tensor)
+        with torch.enable_grad():
+            input_img = input_tensor.clone().detach().requires_grad_(True)
+            self.model.zero_grad()
+            
+            # Forward pass with active gradient graph
+            if hasattr(self.model, "temperature_scale"):
+                logits = self.model(input_img, return_logits=True)
+            elif hasattr(self.model, "forward") and "return_logits" in self.model.forward.__code__.co_varnames:
+                logits = self.model(input_img, return_logits=True)
+            else:
+                logits = self.model(input_img)
 
-        # Handle binary model where logits shape is [batch, 1]
-        num_logits = logits.shape[1] if logits.ndim > 1 else 1
-        if target_class_idx >= num_logits:
-            if num_logits == 1 and target_class_idx == 1:
-                # "No Finding" complement index -> return clean map
+            # Handle binary model where logits shape is [batch, 1]
+            num_logits = logits.shape[1] if logits.ndim > 1 else 1
+            if target_class_idx >= num_logits:
+                if num_logits == 1 and target_class_idx == 1:
+                    # "No Finding" complement index -> return clean map
+                    return np.zeros((512, 512), dtype=np.float32)
+                eff_idx = 0
+            else:
+                eff_idx = target_class_idx
+
+            target_score = logits[0, eff_idx]
+            target_score.backward(retain_graph=True)
+
+            if self.gradients is None or self.activations is None:
                 return np.zeros((512, 512), dtype=np.float32)
-            eff_idx = 0
-        else:
-            eff_idx = target_class_idx
 
-        target_score = logits[0, eff_idx]
-        target_score.backward(retain_graph=True)
-
-        gradients = self.gradients[0]     # [C, H_feat, W_feat]
-        activations = self.activations[0] # [C, H_feat, W_feat]
+            gradients = self.gradients[0]     # [C, H_feat, W_feat]
+            activations = self.activations[0] # [C, H_feat, W_feat]
 
         # Combined Grad-CAM++ and HiRes-CAM calculation
         weights = gradients.mean(dim=(1, 2), keepdim=True)
